@@ -116,7 +116,7 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
   <div class="login-wrap">
     <div class="login-card">
       <h1>Cooperativa Agrícola de Sintra</h1>
-      <p class="sub">Mapa de Stock Online · Ribeiros · Supabase</p>
+      <p class="sub">Mapa de Stock Online · Todos os fornecedores · Supabase</p>
       <div style="margin-bottom:14px">
         <label style="font-weight:600;font-size:12px;color:var(--muted)">Código do mapa</label>
         <input type="text" id="blobIdInput" placeholder="Vazio = criar novo · ou cole o código do link">
@@ -129,11 +129,11 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
         </button>
         <button class="role-btn" onclick="mostrarLojaSelect()">
           <strong>Loja</strong>
-          <span>Abrir mapa com dados publicados</span>
+          <span>Escolher loja · selecionar fornecedor no mapa</span>
         </button>
       </div>
       <div class="loja-select-wrap" id="lojaSelectWrap">
-        <label>Selecionar loja</label>
+        <label>Loja</label>
         <select id="selectLojaHome">
           <option value="AL">Albarraque</option>
           <option value="AM">Arneiro Marinheiro</option>
@@ -142,7 +142,8 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
           <option value="LC" selected>Sintra</option>
           <option value="SA">Sabugo</option>
         </select>
-        <button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="entrarLoja()">Abrir mapa da loja</button>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px">O fornecedor escolhe-se dentro do mapa.</p>
+        <button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="entrarLoja()">Abrir mapa</button>
       </div>
       <div id="homeMsg" style="margin-top:12px"></div>
     </div>
@@ -153,7 +154,7 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
   <div class="topbar">
     <div>
       <h2>Central · Publicar dados</h2>
-      <div class="meta">Ribeiros · Lead time 15 dias · Código: <span id="centralBlobLabel">—</span></div>
+      <div class="meta">Código: <span id="centralBlobLabel">—</span> · O ficheiro de vendas alimenta todos os fornecedores</div>
     </div>
     <div class="topbar-actions">
       <button class="btn btn-secondary" onclick="copiarLink()">Copiar link para lojas</button>
@@ -167,6 +168,9 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
     </div>
     <div class="card">
       <h3>Carregar ficheiro de vendas por loja</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
+        Um ficheiro por loja (Artigo, Stock, Vendas). Na loja escolhem o fornecedor e veem só os itens desse fornecedor.
+      </p>
       <div class="admin-grid" id="adminGrid"></div>
     </div>
     <div class="card">
@@ -179,13 +183,13 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
 <div id="screenLoja" class="screen">
   <div class="topbar">
     <div>
-      <h2>Mapa Ribeiros · <span id="lojaNomeTitulo">Sintra</span></h2>
-      <div class="meta">Ribeiros - Ind e Com de Cereais, Imp e Exp., S.A. · Lead time 15 dias</div>
+      <h2><span id="lojaNomeTitulo">Sintra</span> · <span id="fornNomeTitulo">—</span></h2>
+      <div class="meta" id="fornMeta">Lead time —</div>
     </div>
     <div class="topbar-actions">
       <span id="lojaDataStatus" class="status warn">Sem dados</span>
       <button class="btn btn-secondary" onclick="window.print()">Imprimir</button>
-      <button class="btn btn-export" onclick="exportCSV()">Exportar CSV</button>
+      <button class="btn btn-export" onclick="exportCSV()">Exportar Excel</button>
       <button class="btn btn-secondary" onclick="voltarHome()">Sair</button>
     </div>
   </div>
@@ -194,6 +198,9 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
       <div class="row">
         <div class="field"><label>Data do Mapa</label><input type="date" id="dataMapa"></div>
         <div class="field"><label>Próximo Mapa</label><input type="date" id="proximoMapa"></div>
+        <div class="field"><label>Fornecedor</label>
+          <select id="selectFornLoja" onchange="mudarFornecedorLoja()"></select>
+        </div>
       </div>
     </div>
     <div class="card obs-box">
@@ -227,7 +234,7 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
         <input type="date" id="dataPreenchimento" style="width:140px">
       </div>
       <button class="btn btn-primary" id="btnGuardar" onclick="guardarRespostaOnline()">Guardar online</button>
-      <button class="btn btn-export" onclick="exportCSV()">Exportar CSV</button>
+      <button class="btn btn-export" onclick="exportCSV()">Exportar Excel</button>
       <button class="btn btn-email" onclick="enviarEmail()">Enviar por email</button>
       <div class="count-info">
         <span id="countArtigos">0</span> artigos ·
@@ -239,104 +246,372 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
 </div>
 
 <script>
-/* ========== CONFIG SUPABASE ==========
-   1) No Supabase: Project Settings → API
-   2) Copia "Project URL" e "anon public" key
-   3) Cola abaixo
-*/
 const SUPABASE_URL = "https://uacadlvvonvriiqdxdfr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_pBZHhN4Faqfr70_2FXqezg_UsqWu9JX";
 
-const LEAD_TIME = 15;
-const FORNECEDOR = "Ribeiros - Ind e Com de Cereais, Imp e Exp., S.A.";
 const LOJAS = {
   AL: "Albarraque", AM: "Arneiro Marinheiro", CO: "Colares",
   MM: "Mem Martins", LC: "Sintra", SA: "Sabugo"
 };
 
-const ARTIGOS = [
-  {c:"10100029",d:"Alimpadura de Trigo 5kg (ribeiros)"},
-  {c:"10100031",d:"Alimpadura de Trigo 25kg (ribeiros)"},
-  {c:"10100041",d:"Soja 44 sacos 25kg (ribeiros)"},
-  {c:"10200006",d:"Alpista do Canada 1kg (Ribeiros)"},
-  {c:"10200007",d:"Alpista do Canada 20kg (Ribeiros)"},
-  {c:"10300008",d:"Aveia 4kg (Ribeiros)"},
-  {c:"10300103",d:"Aveia 20kg (Ribeiros)"},
-  {c:"10300104",d:"Aveia 15kg (Ribeiros)"},
-  {c:"10400050",d:"Cevada Ração 5kg (ribeiros)"},
-  {c:"10400052",d:"Cevada Ração 25kg (ribeiros)"},
-  {c:"10500034",d:"Faveca 25kg (ribeiros)"},
-  {c:"10600021",d:"Milho Grado 5kg (Ribeiros)"},
-  {c:"10600103",d:"Milho Medio 5kg (Ribeiros)"},
-  {c:"10600104",d:"Milho Partido 5kg (ribeiros)"},
-  {c:"10600105",d:"Milho Partido 25kg (ribeiros)"},
-  {c:"10600106",d:"Milho Grado 25kg (ribeiros)"},
-  {c:"10600107",d:"Milho Medio 25kg (ribeiros)"},
-  {c:"10900007",d:"Alfarroba triturado grado 15kg (ribeiros)"},
-  {c:"20810013",d:"Luzerna granulada 25kg (ribeiros)"},
-  {c:"81103822",d:"Areia p/gatos perfumada \"Saint Bernard\" 5kg"},
-  {c:"81109001",d:"Mistura p/canarios 1kg (ribeiros)"},
-  {c:"81109002",d:"Mistura p/canarios 5kg (ribeiros)"},
-  {c:"81109004",d:"Mistura p/caturras 1kg (ribeiros)"},
-  {c:"81109005",d:"Mistura p/caturras 5kg (ribeiros)"},
-  {c:"81109007",d:"Mistura p/passaros exoticos 1kg (ribeiros)"},
-  {c:"81109009",d:"Mistura p/periquitos 1kg (ribeiros)"},
-  {c:"81109010",d:"Mistura p/periquitos 5kg (ribeiros)"},
-  {c:"81109012",d:"Lote cereais pintos 5kg (ribeiros)"},
-  {c:"81109013",d:"Lote cereais pintos 25kg (ribeiros)"},
-  {c:"81109014",d:"Mistura aves galinh/frg/patos 5kg (ribeiros)"},
-  {c:"81109015",d:"Mistura aves galinh/frg/patos 25kg (ribeiros)"},
-  {c:"81109017",d:"trinca de arroz 5kg (ribeiros)"},
-  {c:"81109020",d:"Mistura p/caturras 20kg (ribeiros)"},
-  {c:"81109025",d:"Mistura cereais coelhos 25kg (Ribeiros)"},
-  {c:"81109026",d:"Mistura p/periquitos sacos 20kg (ribeiros)"},
-  {c:"81109028",d:"Mistura p/passaros exoticos 5kg (ribeiros)"},
-  {c:"81109029",d:"Mistura p/canarios 20kg (ribeiros)"},
-  {c:"81109030",d:"Girassol branco 500gr (ribeiros)"},
-  {c:"81109031",d:"Mistura cereais corrente 5kg (ribeiros)"},
-  {c:"81109032",d:"Mistura cereais corrente 25kg (ribeiros)"},
-  {c:"81109033",d:"Girassol raiado grado 4kg (ribeiros)"},
-  {c:"81109035",d:"Mistura cereais coelhos 5kg (Ribeiros)"},
-  {c:"81109037",d:"Mistura cereais p/ovinos 25kg (ribeiros)"},
-  {c:"81109038",d:"Mistura p/passaros exoticos 20kg (ribeiros)"},
-  {c:"81109039",d:"Girassol raiado miudo 500gr (ribeiros)"},
-  {c:"81109042",d:"Mistura p/papagaios 12,5kg (ribeiros)"},
-  {c:"81109043",d:"Mistura p/papagaios 3kg (ribeiros)"},
-  {c:"81109046",d:"Areia p/gatos normal s/cheiro 5kg"},
-  {c:"81109047",d:"Massa p/caes 5kg (ribeiros)"},
-  {c:"81109048",d:"Casca de Ostra 1,5Kg (Ribeiros)"},
-  {c:"81109053",d:"Trinca de arroz 25kg (ribeiros)"},
-  {c:"81109054",d:"Aglomerado cat jet aroma lavanda 5lt bentonita"},
-  {c:"81109055",d:"Aglomerado cat jet aroma po talco 5lt bentonita"},
-  {c:"81109056",d:"Aglomerado cat jet aroma sabao marselha 5lt benton"},
-  {c:"81109057",d:"Aglomerado cat jet carvao ativo 20lt bentonita"},
-  {c:"81109058",d:"Mistura Cereais p/cavalos 25kg (ribeiros)"},
-  {c:"81109059",d:"Mistura p/ruminantes 25kg (ribeiros)"},
-  {c:"81109060",d:"Girassol preto emb 750gr (ribeiros)"},
-  {c:"81109061",d:"Girassol preto saq 5kg (ribeiros)"},
-  {c:"81109062",d:"Mistura p/papagaios 600Gr  (ribeiros)"},
-  {c:"81109063",d:"Mistura para Agapornis 1kg (ribeiros)"},
-  {c:"81109064",d:"Girassol preto saco 15kg (ribeiros)"},
-  {c:"81109065",d:"Girassol branco 5kg (ribeiros)"},
-  {c:"81109066",d:"Mistura para ruminantes melaçada 25kg (ribeiros)"},
-  {c:"81109300",d:"Teycat chicken (frango) 415gr"},
-  {c:"81109301",d:"Teycat beef (vaca) 415gr"},
-  {c:"81109302",d:"Teycat salmon (salmao) 415gr"},
-  {c:"81109303",d:"Teycat tuna (atum) 415gr"},
-  {c:"81109310",d:"Teycan chicken (frango) 415gr"},
-  {c:"81109311",d:"Teycan beef (vaca) 415gr"},
-  {c:"81109320",d:"Petcool cao frango 1250gr"},
-  {c:"81109321",d:"Petcool cao vaca 1250gr"},
-  {c:"81109326",d:"Petcool gato atum 405gr"},
-  {c:"82002006",d:"Aparas madeira 20kg (ribeiros)"},
-  {c:"82002011",d:"Aparas madeira 500 LT (ribeiros) (14kg)"}
-];
+const FORNECEDORES = {
+  "ribeiros": {
+    label: "Ribeiros - Ind e Com de Cereais, Imp e Exp., S.A.",
+    lead: 15,
+    items: [
+      {c:"10100029",d:"Alimpadura de Trigo 5kg (ribeiros)"},
+      {c:"10100031",d:"Alimpadura de Trigo 25kg (ribeiros)"},
+      {c:"10100041",d:"Soja 44 sacos 25kg (ribeiros)"},
+      {c:"10200006",d:"Alpista do Canada 1kg (Ribeiros)"},
+      {c:"10200007",d:"Alpista do Canada 20kg (Ribeiros)"},
+      {c:"10300008",d:"Aveia 4kg (Ribeiros)"},
+      {c:"10300103",d:"Aveia 20kg (Ribeiros)"},
+      {c:"10300104",d:"Aveia 15kg (Ribeiros)"},
+      {c:"10400050",d:"Cevada Ração 5kg (ribeiros)"},
+      {c:"10400052",d:"Cevada Ração 25kg (ribeiros)"},
+      {c:"10500034",d:"Faveca 25kg (ribeiros)"},
+      {c:"10600021",d:"Milho Grado 5kg (Ribeiros)"},
+      {c:"10600103",d:"Milho Medio 5kg (Ribeiros)"},
+      {c:"10600104",d:"Milho Partido 5kg (ribeiros)"},
+      {c:"10600105",d:"Milho Partido 25kg (ribeiros)"},
+      {c:"10600106",d:"Milho Grado 25kg (ribeiros)"},
+      {c:"10600107",d:"Milho Medio 25kg (ribeiros)"},
+      {c:"10900007",d:"Alfarroba triturado grado 15kg (ribeiros)"},
+      {c:"20810013",d:"Luzerna granulada 25kg (ribeiros)"},
+      {c:"81103822",d:"Areia p/gatos perfumada \"Saint Bernard\" 5kg"},
+      {c:"81109001",d:"Mistura p/canarios 1kg (ribeiros)"},
+      {c:"81109002",d:"Mistura p/canarios 5kg (ribeiros)"},
+      {c:"81109004",d:"Mistura p/caturras 1kg (ribeiros)"},
+      {c:"81109005",d:"Mistura p/caturras 5kg (ribeiros)"},
+      {c:"81109007",d:"Mistura p/passaros exoticos 1kg (ribeiros)"},
+      {c:"81109009",d:"Mistura p/periquitos 1kg (ribeiros)"},
+      {c:"81109010",d:"Mistura p/periquitos 5kg (ribeiros)"},
+      {c:"81109012",d:"Lote cereais pintos 5kg (ribeiros)"},
+      {c:"81109013",d:"Lote cereais pintos 25kg (ribeiros)"},
+      {c:"81109014",d:"Mistura aves galinh/frg/patos 5kg (ribeiros)"},
+      {c:"81109015",d:"Mistura aves galinh/frg/patos 25kg (ribeiros)"},
+      {c:"81109017",d:"trinca de arroz 5kg (ribeiros)"},
+      {c:"81109020",d:"Mistura p/caturras 20kg (ribeiros)"},
+      {c:"81109025",d:"Mistura cereais coelhos 25kg (Ribeiros)"},
+      {c:"81109026",d:"Mistura p/periquitos sacos 20kg (ribeiros)"},
+      {c:"81109028",d:"Mistura p/passaros exoticos 5kg (ribeiros)"},
+      {c:"81109029",d:"Mistura p/canarios 20kg (ribeiros)"},
+      {c:"81109030",d:"Girassol branco 500gr (ribeiros)"},
+      {c:"81109031",d:"Mistura cereais corrente 5kg (ribeiros)"},
+      {c:"81109032",d:"Mistura cereais corrente 25kg (ribeiros)"},
+      {c:"81109033",d:"Girassol raiado grado 4kg (ribeiros)"},
+      {c:"81109035",d:"Mistura cereais coelhos 5kg (Ribeiros)"},
+      {c:"81109037",d:"Mistura cereais p/ovinos 25kg (ribeiros)"},
+      {c:"81109038",d:"Mistura p/passaros exoticos 20kg (ribeiros)"},
+      {c:"81109039",d:"Girassol raiado miudo 500gr (ribeiros)"},
+      {c:"81109042",d:"Mistura p/papagaios 12,5kg (ribeiros)"},
+      {c:"81109043",d:"Mistura p/papagaios 3kg (ribeiros)"},
+      {c:"81109046",d:"Areia p/gatos normal s/cheiro 5kg"},
+      {c:"81109047",d:"Massa p/caes 5kg (ribeiros)"},
+      {c:"81109048",d:"Casca de Ostra 1,5Kg (Ribeiros)"},
+      {c:"81109053",d:"Trinca de arroz 25kg (ribeiros)"},
+      {c:"81109054",d:"Aglomerado cat jet aroma lavanda 5lt bentonita"},
+      {c:"81109055",d:"Aglomerado cat jet aroma po talco 5lt bentonita"},
+      {c:"81109056",d:"Aglomerado cat jet aroma sabao marselha 5lt benton"},
+      {c:"81109057",d:"Aglomerado cat jet carvao ativo 20lt bentonita"},
+      {c:"81109058",d:"Mistura Cereais p/cavalos 25kg (ribeiros)"},
+      {c:"81109059",d:"Mistura p/ruminantes 25kg (ribeiros)"},
+      {c:"81109060",d:"Girassol preto emb 750gr (ribeiros)"},
+      {c:"81109061",d:"Girassol preto saq 5kg (ribeiros)"},
+      {c:"81109062",d:"Mistura p/papagaios 600Gr  (ribeiros)"},
+      {c:"81109063",d:"Mistura para Agapornis 1kg (ribeiros)"},
+      {c:"81109064",d:"Girassol preto saco 15kg (ribeiros)"},
+      {c:"81109065",d:"Girassol branco 5kg (ribeiros)"},
+      {c:"81109066",d:"Mistura para ruminantes melaçada 25kg (ribeiros)"},
+      {c:"81109300",d:"Teycat chicken (frango) 415gr"},
+      {c:"81109301",d:"Teycat beef (vaca) 415gr"},
+      {c:"81109302",d:"Teycat salmon (salmao) 415gr"},
+      {c:"81109303",d:"Teycat tuna (atum) 415gr"},
+      {c:"81109310",d:"Teycan chicken (frango) 415gr"},
+      {c:"81109311",d:"Teycan beef (vaca) 415gr"},
+      {c:"81109320",d:"Petcool cao frango 1250gr"},
+      {c:"81109321",d:"Petcool cao vaca 1250gr"},
+      {c:"81109326",d:"Petcool gato atum 405gr"},
+      {c:"82002006",d:"Aparas madeira 20kg (ribeiros)"},
+      {c:"82002011",d:"Aparas madeira 500 LT (ribeiros) (14kg)"}
+    ]
+  },
+  "avenal": {
+    label: "Avenal Petfood, S.A.",
+    lead: 30,
+    items: [
+      {c:"81100017",d:"Avenal cat carne 4kg"},
+      {c:"81100144",d:"Avenal dog alta energia 18kg"},
+      {c:"81100372",d:"AVENAL Dog Adulto 20 Kg"},
+      {c:"81100417",d:"Avenal cat peixe 18kg"},
+      {c:"81100426",d:"Avenal Dog Basic 20kg"},
+      {c:"81100445",d:"Avenal cat baby 2kg"},
+      {c:"81100519",d:"AVENAL DOG CAÇA 18 KG"},
+      {c:"81100600",d:"Avenal Dog Mini 4kg"},
+      {c:"81100601",d:"Avenal cat esterilizado 2kg"},
+      {c:"81100603",d:"Avenal cat salmao 2kg"},
+      {c:"81100816",d:"Avenaldog 4 kg"},
+      {c:"81100820",d:"Avenal cat peixe 4 kg"},
+      {c:"81100822",d:"Avenal cat carne 2kg"},
+      {c:"81100823",d:"Avenal dog salmao e arroz 15kg"},
+      {c:"81100824",d:"Avenal dog frango e arroz 15kg"},
+      {c:"81100825",d:"Avenal dog borrego e arroz 15kg"},
+      {c:"81104020",d:"Avenal Puppy 4kg"},
+      {c:"81104021",d:"Avenal Puppy 18kg"},
+      {c:"81104022",d:"Avenal cat esterilizado 10kg"}
+    ]
+  },
+  "galrao": {
+    label: "Rações Galrão, S.A.",
+    lead: 30,
+    items: [
+      {c:"10200003",d:"Alpista do Canada 1kg (galrao)"},
+      {c:"20810004",d:"LUZERNA cubos 20kg (galrao)"},
+      {c:"20810010",d:"Beterraba (polpa) granulada 30Kg"},
+      {c:"20810014",d:"Luzerna marina 5kg (galrao)"},
+      {c:"20810015",d:"Granulado polpa beterraba 25kg (galrao)"},
+      {c:"20810016",d:"Luzerna marina 1kg (galrao)"},
+      {c:"50400101",d:"Coentros avulso (semente)"},
+      {c:"50410652",d:"ERVILHA RONDO MEIA PALHA"},
+      {c:"50410653",d:"Ervilha Torta Trepar Carouby"},
+      {c:"50410663",d:"ERVILHA TORTA TREPAR KG"},
+      {c:"50470393",d:"FEIJAO BENCATA TREPAR KG"},
+      {c:"50470403",d:"GRÃO BRANCO DO ALENTEJO KG."},
+      {c:"50470413",d:"Feijao Catarino rasteiro/gordo seco (ao Kg)"},
+      {c:"50470423",d:"FEIJAO PATARECO RASTEIRO KG"},
+      {c:"50470443",d:"FEIJÃO MANATA RAST.ESPEC KG."},
+      {c:"50470453",d:"FEIJAO CATARINO TREPAR KG"},
+      {c:"50470455",d:"Feijao Branco trepar (ao Kg) Helda"},
+      {c:"50470460",d:"FEIJAO BENCANT.TRE.REGIO KG"},
+      {c:"50470461",d:"FEIJAO MANTEIGA REGIONAL KG"},
+      {c:"50470462",d:"FEIJAO CATARIN GR RAST REGION KG"},
+      {c:"50470463",d:"FEIJAO MANATA RAST.REGION KG"},
+      {c:"50470464",d:"FEIJÃO FRADE RAST. REGIONAL / KG / AMERICANO"},
+      {c:"50480018",d:"FEIJAO RASTEIRO GARRAFAL AO KILO"},
+      {c:"50600010",d:"Aveia Nacional ( ao Kg )"},
+      {c:"50600020",d:"Aveia Regional 25kg (galrao)"},
+      {c:"50600021",d:"Fava Histral Kg"},
+      {c:"50600113",d:"FAVA GRADA REGIONAL / KG (galrao)"},
+      {c:"50600119",d:"TREMOÇO GRADO NAC. REGIONAL 1.0 KG GALRÃO"},
+      {c:"50600123",d:"Fava Super Agua Dulce Kg (Galrao)"},
+      {c:"50600126",d:"Prado Permanente Ovinos Kg"},
+      {c:"50670082",d:"Milho Painço 1kg (Galrao)"},
+      {c:"50670085",d:"MILHO BELGRANO AVULSO (GALRÃO)"},
+      {c:"50670092",d:"Milho Alvo 1kg (Galrao)"},
+      {c:"50670110",d:"AZEVEM PERENE NUI 25.0 GALRÃO / KG."},
+      {c:"50670150",d:"AZEVEM ANUAL HELEN KG"},
+      {c:"50670170",d:"TREVO SUBTERRANEO AO KG"},
+      {c:"50670171",d:"Trevo branco huia kg"},
+      {c:"50670172",d:"Trevo violeta lucrum kg"},
+      {c:"50670210",d:"Festuca arrundinacia starlet ao kg"},
+      {c:"50670220",d:"TREVO ENCARNADO CONTEA / KG"},
+      {c:"50670270",d:"Milho Belgrano 15.000 sementes (Galrao)"},
+      {c:"81100001",d:"GRANULARE PRETO RAFF MELROS"},
+      {c:"81100010",d:"Raçao p/Cavalos Mant Esmag 30kg (Galrao)"},
+      {c:"81100018",d:"Girassol branco 500gr (galrao)"},
+      {c:"81100023",d:"Mistura P/Coelhos Anoes 5Kg (Galrao)"},
+      {c:"81100029",d:"LECHAVIT 5 KG"},
+      {c:"81100039",d:"Granulado peixe agua fria 5kg (galrao)"},
+      {c:"81100042",d:"Lechavit Fortiblok 10g"},
+      {c:"81100043",d:"Girassol Raiado 5kg (galrao)"},
+      {c:"81100048",d:"CASCA DE OSTRA PACOTES 1kg (galrao)"},
+      {c:"81100068",d:"Granulado p/Melros 1kg (galrao)"},
+      {c:"81100083",d:"Mistura P/Coelhos Anoes 500Gr (Galrao)"},
+      {c:"81100086",d:"Girassol Branco 5Kg (Galrão)"},
+      {c:"81100094",d:"Girassol Raiado Grado 15kg (galrao)"},
+      {c:"81100096",d:"Casca Ostra Miuda 500Gr (galrao)"},
+      {c:"81100099",d:"Raçao p/cavalo simples manut 30KG (Galrao)"},
+      {c:"81100121",d:"Papa insectivora premium 650gr (galrao)"},
+      {c:"81100122",d:"Natural vitamineral 1kg (galrao)"},
+      {c:"81100127",d:"Natural grit 3kg (galrao)"},
+      {c:"81100129",d:"Rolas stand versele 1kg (galrao)"},
+      {c:"81100131",d:"Natural pierre picorer emb 620gr (galrao)"},
+      {c:"81100132",d:"Casca de Ostra Miuda 1,2 Kg Galrao"},
+      {c:"81100136",d:"Rolas stand versele 4kg (galrao)"},
+      {c:"81100160",d:"Mistura P/Canarios 5Kg (Galrao)"},
+      {c:"81100161",d:"Girassol preto 1kg (Galrao)"},
+      {c:"81100164",d:"Mistura P/Caturras 5Kg (Galrao)"},
+      {c:"81100210",d:"Mistura p/Canarios 1kg (Galrao)"},
+      {c:"81100211",d:"Mistura P/Periquitos 1kg (Galrao)"},
+      {c:"81100212",d:"Mistura P/Passaros Exoticos 1kg (Galrao)"},
+      {c:"81100213",d:"Mistura P/Caturras 500gr (Galrao)"},
+      {c:"81100214",d:"Mistura P/Papagaio 500gr (Galrao)"},
+      {c:"81100217",d:"Mistura P/Coelhos Anoes sacos 25kg (Galrao)"},
+      {c:"81100218",d:"Girassol Raiado 500gr (Galrao)"},
+      {c:"81100219",d:"Mistura P/Canarios 25kg (Galrao)"},
+      {c:"81100220",d:"Mistura p/Frg corrente sacos 25kg (Galrao)"},
+      {c:"81100221",d:"Mistura p/Pintos saco 25kg (Galrao)"},
+      {c:"81100226",d:"Mistura P/Caturras sacos 20kg (galrao)"},
+      {c:"81100229",d:"Mistura P/Periquitos 5Kg (Galrao)"},
+      {c:"81100233",d:"Mistura P/Papagaio 5Kg (Galrao)"},
+      {c:"81100235",d:"Mistura P/Frg corrente 5Kg (Galrao)"},
+      {c:"81100236",d:"Mistura p/Pintos 5kg (Galrao)"},
+      {c:"81100237",d:"Trinca de Arroz 5Kg (Galrao)"},
+      {c:"81100244",d:"Mistura P/Pássaros Exóticos 25 Kg (Galrão)"},
+      {c:"81100245",d:"GIRASSOL BRANCO 5K (GALRÃO)"},
+      {c:"81100305",d:"Trinca de arroz 25kg (galrao)"},
+      {c:"81100415",d:"CASCA DE OSTRA 10KG (GALRAO)"},
+      {c:"81100431",d:"Papa Amarela vit Gord 1kg (Galrao)"},
+      {c:"81100432",d:"Papa Vermelha Suplemento 1kg (Galrao)"},
+      {c:"81100433",d:"Papa Frutos Tropicais 1kg (Galrao)"},
+      {c:"81100434",d:"Papa Universal Extra 1kg (Galrao)"},
+      {c:"81100439",d:"Nutribird P15 original 1KG (galrao)"},
+      {c:"81100441",d:"Girassol Preto 5 Kg ( Galrao )"},
+      {c:"81100442",d:"Raçao simples p/coelho 5kg galrao"},
+      {c:"81100444",d:"Mistura p/Frangos Belguita 20kg (Galrao)"},
+      {c:"81100446",d:"Mistura p/Frangos  Reprod 20kg (galrao)"},
+      {c:"81100447",d:"Girassol preto 15 kg (galrao)"},
+      {c:"81100471",d:"Raçao simples de ovinos 30kg galrao"},
+      {c:"81100480",d:"Aminovite L 100ml"},
+      {c:"81100481",d:"Aminovite L zoon pass. 30c"},
+      {c:"81100483",d:"Versele-Laga Prestige Grit 2,5Kg (galrao)"},
+      {c:"81100555",d:"Mistura P/Passaros Exoticos 5kg (Galrao)"},
+      {c:"81110002",d:"Flatazor Prestige Light 15Kg"},
+      {c:"82600004",d:"Fardo Palha de Trigo (Galrao)"}
+    ]
+  },
+  "selecao": {
+    label: "Raçoes Selecçao, SA",
+    lead: 30,
+    items: [
+      {c:"21321040",d:"Selecçao 104 pintos p/carne 1ªfase 5kg gra/mig"},
+      {c:"21321049",d:"Selecçao 104 pintos p/carne 1ªfase 5kg farinha"},
+      {c:"21321150",d:"Selecçao 115 frangos p/carne 2ª fase 5kg gra/mig"},
+      {c:"21321159",d:"Selecçao 115 frangos p/carne 2ª fase 5kg farinha"},
+      {c:"21321200",d:"Selecçao 120 galinhas poed no solo 5kg gra/mig"},
+      {c:"21321209",d:"Selecçao 120 galinhas poed no solo 5kg farinha"},
+      {c:"21327000",d:"Selecçao 700 aliment único cesc e engorda 5kg gran"},
+      {c:"21327030",d:"Selecçao 703 reprod e engorda super coelho 5kg gra"},
+      {c:"21331040",d:"Selecçao 104 pintos p/carne 1ªfase 25kg gra/mig"},
+      {c:"21331150",d:"Selecçao 115 frangos p/carne 2ª fase 25kg gra/mig"},
+      {c:"21331159",d:"Selecçao 115 frangos p/carne 2ª fase 25kg farinha"},
+      {c:"21331160",d:"Selecçao 115 frangos p/carne 2ª fase 25kg especial"},
+      {c:"21331200",d:"Selecçao 120 galinhas poed no solo 25kg gra/mig"},
+      {c:"21331209",d:"Selecçao 120 galinhas poed no solo 25kg farinha"},
+      {c:"21331220",d:"Selecçao 122 galinhas poed no solo 25kg gra especi"},
+      {c:"21331229",d:"Selecçao 122 galinhas poed no solo 25kg far espec"},
+      {c:"21333100",d:"Selecçao 310 vitelos ate 3 meses 25kg granulado"},
+      {c:"21333320",d:"Selecçao 332 novilhos manut e acab 25kg granulado"},
+      {c:"21334000",d:"Selecçao multi-especies granulado 25kg"},
+      {c:"21334010",d:"Selecçao 401 cavalos de trabalho 25kg granulado"},
+      {c:"21335100",d:"Selecçao 510 borregos desmame precoce sac 25kg gra"},
+      {c:"21335110",d:"Selecçao 511 borregos ate 25kg sac 25kg granulado"},
+      {c:"21335200",d:"Selecçao 520 ovelhas aleitantes 25kg granulado"},
+      {c:"21337000",d:"Selecçao 700 aliment único cesc e engorda 25kg gra"},
+      {c:"21337030",d:"Selecçao 703 reprod e engorda super coelho 25kg gr"},
+      {c:"21338010",d:"Selecçao 801 leitoes inic ate 40/45kg 25kg granul"},
+      {c:"21338150",d:"Selecçao 815 porcos cresc / engorda 25kg granulado"}
+    ]
+  },
+  "diaco": {
+    label: "Diamantino Coelho & Filho, S.A.",
+    lead: 30,
+    items: [
+      {c:"20810003",d:"FENO DE LUZERNA 40LT (Diaco) 70021S00"},
+      {c:"22121040",d:"SOL 104 pintos 0 a 21 dias 5kg gra/mig"},
+      {c:"22121150",d:"SOL 115 frangos 21 dias até ao abate 5kg gra/mig"},
+      {c:"22121159",d:"SOL 115 frangos 21 dias até ao abate 5kg far"},
+      {c:"22121200",d:"SOL 120 galinhas poedeiras 5kg gra/mig"},
+      {c:"22121209",d:"SOL 120 galinhas poedeiras 5kg far"},
+      {c:"22127010",d:"SOL 701 coelhos 21 dias até ao abate 5kg gra"},
+      {c:"22131040",d:"SOL 104 pintos 0 a 21 dias 25kg gra/mig"},
+      {c:"22131150",d:"SOL 115 frangos 21 dias até ao abate 25kg gra/mig"},
+      {c:"22131200",d:"SOL 120 galinhas poedeiras 25kg gra/mig"},
+      {c:"22131209",d:"SOL 120 galinhas poedeiras 25kg far"},
+      {c:"22134010",d:"SOL 401 Equideos manutençao - trab ligeiro 25kg gr"},
+      {c:"22137010",d:"SOL 701 coelhos 21 dias até ao abate 25kg gra"},
+      {c:"22138000",d:"SOL 800 leitoes até aos 25kg gra 25kg"},
+      {c:"22138150",d:"SOL 815 suinos cresc / engorda 25kg gra"},
+      {c:"81109500",d:"Patudini dog adulto alta energia frango 15kg"},
+      {c:"81109501",d:"Patudini dog adulto manutençao frango 18kg"},
+      {c:"82000698",d:"Lenha mistura 10kg"},
+      {c:"82002005",d:"Aparas em fardo Extra 500LT 74000M14M Diaco"},
+      {c:"82002007",d:"Aparas em fardo Extra Premium 500LT 74000M11MDiaco"},
+      {c:"82002008",d:"Fardo Aparas de Madeira Aprox 5,5Kg Diaco"},
+      {c:"82002009",d:"Fardo Aparas Madeira extra 180L 4kg diaco 74000m04"},
+      {c:"82002010",d:"Fardo Aparas Madeira extra 500L 10k diaco 74000m10"},
+      {c:"82121010",d:"Alimento natural aves de capoeira 5kg"},
+      {c:"82121200",d:"Avidiaco Galinhas 5kg mistura galinhas poedeiras"},
+      {c:"82121210",d:"Avidiaco Especial 5kg mistura aves capoeira"},
+      {c:"82127010",d:"Lapidiaco Unico (Alim nat coelhos) 5kg"},
+      {c:"82131010",d:"Alimento natural aves de capoeira 25kg"},
+      {c:"82135030",d:"Alimento Natural p/Ovinos e Caprinos 25kg"},
+      {c:"82161040",d:"Lote cereais corrente 20kg para aves"},
+      {c:"82161200",d:"Avidiaco Galinhas 20kg mistura galinhas poedeiras"},
+      {c:"82161210",d:"Avidiaco Especial 20kg mistura aves capoeira"},
+      {c:"82164000",d:"Equidiaco Manutençao (cavalos) 20kg"},
+      {c:"82165010",d:"Ovidiaco Manutençao (ovinos/capr) 20kg"},
+      {c:"82167010",d:"Lapidiaco Unico (alim nat. coelhos) 20kg"}
+    ]
+  },
+  "nanta": {
+    label: "Nanta Portugal, S.A.",
+    lead: 30,
+    items: [
+      {c:"21421040",d:"PROVI manjerecria 104 pintos iniciaçao Gra 5 kg"},
+      {c:"21421150",d:"PROVI manjefrango 115 frangos carne Gra 5 kg"},
+      {c:"21421200",d:"PROVI manjeovo 120 galinhas poedeiras Gra 5 kg"},
+      {c:"21431040",d:"PROVI manjerecria 104 pintos iniciaçao Gra 25 kg"},
+      {c:"21431150",d:"PROVI manjefrango 115 frangos carne Gra 25 kg"},
+      {c:"21431200",d:"PROVI manjeovo 120 galinhas poedeiras Gra 25 kg"},
+      {c:"21438150",d:"PROVI manjesuinos 815 porcos engord Gra 25 kg"},
+      {c:"21631650",d:"HI-PRO PERU 1 Perus Pre Iniciaçao 25kg gra"},
+      {c:"81100710",d:"Bloco mineral para aves 4kg Camperblock"},
+      {c:"81100711",d:"Suplemento vitaminico-mineral aves 3kg Campervit"},
+      {c:"81100712",d:"Suplement vitaminico-mineral coelho 3kg Camperfort"},
+      {c:"81100713",d:"Aliment compl pintos/patos/perus 5kg Camperstarter"},
+      {c:"81100714",d:"Bloco vitaminico-mineral ruminates 10kg nantablok"},
+      {c:"81100715",d:"Bloco sal p/ruminantes e equideos 10kg NantaSal"},
+      {c:"81108050",d:"Mistura para Aves (Nature Aves) 5 kg Cargill"},
+      {c:"81108053",d:"Mistura para coelhos (Natura coelhos) 5kg Cargill"},
+      {c:"81108054",d:"Mistura para Aves (Nature Aves) 25kg Cargill"},
+      {c:"81108058",d:"Ovo Plus Mistura criaçao caseira galinha poed 25kg"},
+      {c:"81108059",d:"Ovo Plus Mistura criaçao caseira galinhas poed 5kg"},
+      {c:"83600001",d:"Arion Essential Puppy baby 3kg"},
+      {c:"83600002",d:"Arion Essential Puppy baby 15kg"},
+      {c:"83600003",d:"Arion Essential Adult mini salmon 3kg"},
+      {c:"83600004",d:"Arion Essential Senior Light 3kg"},
+      {c:"83600005",d:"Arion Essential Senior Light 15kg"},
+      {c:"83600006",d:"Arion Essential Adult salmon 15kg"},
+      {c:"83600007",d:"Arion Essential Adult Iberian pork 15kg"},
+      {c:"83600008",d:"Arion Essential Adult chicken 18kg"},
+      {c:"83600009",d:"Arion Essential Cat mixi 3kg"},
+      {c:"83600010",d:"Arion Essential Cat mixi 15kg"},
+      {c:"83600011",d:"Arion Essential Cat sterilized 3kg"},
+      {c:"83600012",d:"Arion Essential Cat sterilized 15kg"}
+    ]
+  },
+  "sdpaa": {
+    label: "SDPAA - Soc Distrib de Prod e Alim Animal, Lda",
+    lead: 30,
+    items: [
+      {c:"20321200",d:"NANTA camperovo gra 5kg"},
+      {c:"20321209",d:"NANTA camperovo far 5kg"},
+      {c:"20327040",d:"NANTA campersafe coelhos em crescimento GR 5kg"},
+      {c:"20327110",d:"NANTA cunilap 8100 coelhos reprod GR 5kg"},
+      {c:"20331200",d:"NANTA camperovo gra 25kg"},
+      {c:"20331510",d:"NANTA perdizes postura 25kg gra"},
+      {c:"20331520",d:"NANTA perdizes iniciaçao 25kg mig"},
+      {c:"20337030",d:"NANTA campersafe coelhos em crescimento GR 25kg"},
+      {c:"20337110",d:"NANTA cunilap 8100 cresc e engorda GR 25kg"}
+    ]
+  },
+};
 
 let sb = null;
 let blobId = null;
 let currentLoja = "LC";
+let currentForn = "ribeiros";
 let stockData = {};
 let cloudData = { lojas: {} };
+let leadTime = 15;
+
+function getArtigos() {
+  return (FORNECEDORES[currentForn] && FORNECEDORES[currentForn].items) || [];
+}
+function getFornLabel() {
+  return (FORNECEDORES[currentForn] && FORNECEDORES[currentForn].label) || currentForn;
+}
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function addDays(iso, n) {
@@ -351,10 +626,27 @@ function newId() {
   return Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 6);
 }
 
+function fillFornSelects() {
+  const opts = Object.keys(FORNECEDORES).map(k => {
+    const f = FORNECEDORES[k];
+    return `<option value="${k}">${f.label} (${f.items.length} · LT ${f.lead}d)</option>`;
+  }).join("");
+  document.getElementById("selectFornLoja").innerHTML = opts;
+}
+
+function fornecedorKeys() {
+  return Object.keys(FORNECEDORES);
+}
+
+function nextFornecedor(key) {
+  const keys = fornecedorKeys();
+  const i = keys.indexOf(key);
+  if (i < 0 || i >= keys.length - 1) return null;
+  return keys[i + 1];
+}
+
 function initSupabase() {
-  if (SUPABASE_ANON_KEY === "COLE_AQUI_A_ANON_KEY" || !SUPABASE_ANON_KEY) {
-    throw new Error("Configura a SUPABASE_ANON_KEY no código (Project Settings → API → anon public).");
-  }
+  if (!SUPABASE_ANON_KEY) throw new Error("SUPABASE_ANON_KEY em falta");
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
@@ -362,7 +654,7 @@ async function cloudCreate(data) {
   const id = newId();
   const row = {
     id,
-    fornecedor: "Ribeiros",
+    fornecedor: "multi",
     lojas: data.lojas || {},
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
@@ -371,15 +663,15 @@ async function cloudCreate(data) {
   if (error) throw new Error(error.message);
   return id;
 }
-
 async function cloudGet(id) {
   const { data, error } = await sb.from("mapas_stock").select("*").eq("id", id).single();
-  if (error) throw new Error(error.message === "JSON object requested, multiple (or no) rows returned"
-    ? "Código do mapa não encontrado"
-    : error.message);
+  if (error) throw new Error(
+    error.message.includes("0 rows") || error.code === "PGRST116"
+      ? "Código do mapa não encontrado"
+      : error.message
+  );
   return { lojas: data.lojas || {}, createdAt: data.created_at, updatedAt: data.updated_at };
 }
-
 async function cloudPut(id, data) {
   const { error } = await sb.from("mapas_stock").update({
     lojas: data.lojas || {},
@@ -465,31 +757,59 @@ async function entrarLoja() {
     cloudData = await cloudGet(blobId);
     setUrlBlobId(blobId);
     currentLoja = document.getElementById("selectLojaHome").value;
+    currentForn = "ribeiros";
+    document.getElementById("selectFornLoja").value = currentForn;
+    aplicarFornecedorUI();
     document.getElementById("lojaNomeTitulo").textContent = LOJAS[currentLoja];
     document.getElementById("dataMapa").value = todayISO();
-    document.getElementById("proximoMapa").value = addDays(todayISO(), 7);
+    document.getElementById("proximoMapa").value = addDays(todayISO(), currentForn === "ribeiros" ? 7 : 14);
     document.getElementById("dataPreenchimento").value = todayISO();
     document.getElementById("obsGeral").value = "";
     document.getElementById("preenchidoPor").value = "";
+
     const pub = (cloudData.lojas || {})[currentLoja];
     if (pub && pub.stockData) {
       stockData = pub.stockData;
       document.getElementById("lojaDataStatus").textContent =
-        "Online · " + (pub.updatedAt || "—") + " · " + Object.keys(stockData).length + " linhas";
+        "Online · " + (pub.updatedAt || "—") + " · " + Object.keys(stockData).length + " linhas vendas";
       document.getElementById("lojaDataStatus").className = "status ok";
       if (pub.dataMapa) document.getElementById("dataMapa").value = pub.dataMapa;
     } else {
       stockData = {};
-      document.getElementById("lojaDataStatus").textContent = "Sem dados para esta loja";
+      document.getElementById("lojaDataStatus").textContent = "Sem dados de vendas para esta loja";
       document.getElementById("lojaDataStatus").className = "status warn";
     }
     showScreen("screenLoja");
     renderTable();
-    if (pub && pub.resposta) applyResposta(pub.resposta);
+    const resp = pub && pub.respostas && pub.respostas[currentForn];
+    if (resp) applyResposta(resp);
     msg.innerHTML = "";
   } catch (e) {
     msg.innerHTML = '<span class="status err">' + e.message + '</span>';
   }
+}
+
+function aplicarFornecedorUI() {
+  const f = FORNECEDORES[currentForn];
+  leadTime = f ? f.lead : 30;
+  document.getElementById("fornNomeTitulo").textContent = f ? f.label.split(" - ")[0].split(",")[0] : currentForn;
+  document.getElementById("fornMeta").textContent = (f ? f.label : "") + " · Lead time " + leadTime + " dias";
+}
+
+function mudarFornecedorLoja() {
+  // guardar UI atual? não — muda lista
+  currentForn = document.getElementById("selectFornLoja").value;
+  aplicarFornecedorUI();
+  document.getElementById("proximoMapa").value = addDays(
+    document.getElementById("dataMapa").value || todayISO(),
+    currentForn === "ribeiros" ? 7 : 14
+  );
+  document.getElementById("obsGeral").value = "";
+  document.getElementById("preenchidoPor").value = "";
+  renderTable();
+  const pub = (cloudData.lojas || {})[currentLoja];
+  const resp = pub && pub.respostas && pub.respostas[currentForn];
+  if (resp) applyResposta(resp);
 }
 
 function copiarLink() {
@@ -584,11 +904,12 @@ function calcPrevisao(stockUsado, vendas) {
   const v = Number(vendas), s = Number(stockUsado);
   if (isNaN(s)) return null;
   const vn = isNaN(v) ? 0 : v;
-  return Math.max(0, Math.ceil((vn / 30) * LEAD_TIME - s));
+  return Math.max(0, Math.ceil((vn / 30) * leadTime - s));
 }
 function renderTable() {
   const tbody = document.getElementById("tbody");
   tbody.innerHTML = "";
+  const ARTIGOS = getArtigos();
   ARTIGOS.forEach(art => {
     const d = stockData[art.c] || {};
     const stockSis = d.stock != null ? d.stock : "";
@@ -706,6 +1027,7 @@ function collectResposta() {
     dataPreenchimento: document.getElementById("dataPreenchimento").value,
     obs: document.getElementById("obsGeral").value,
     dataMapa: document.getElementById("dataMapa").value,
+    fornecedor: currentForn,
     rows
   };
 }
@@ -738,57 +1060,73 @@ async function guardarRespostaOnline() {
     cloudData = await cloudGet(blobId);
     if (!cloudData.lojas) cloudData.lojas = {};
     if (!cloudData.lojas[currentLoja]) cloudData.lojas[currentLoja] = {};
-    cloudData.lojas[currentLoja].resposta = collectResposta();
+    if (!cloudData.lojas[currentLoja].respostas) cloudData.lojas[currentLoja].respostas = {};
+    cloudData.lojas[currentLoja].respostas[currentForn] = collectResposta();
     cloudData.lojas[currentLoja].respostaAt = nowStr();
     await cloudPut(blobId, cloudData);
-    document.getElementById("lojaDataStatus").textContent = "Guardado · " + nowStr();
+    document.getElementById("lojaDataStatus").textContent = "Guardado · " + nowStr() + " · " + currentForn;
     document.getElementById("lojaDataStatus").className = "status ok";
-    alert("Resposta guardada no Supabase.");
+
+    const nxt = nextFornecedor(currentForn);
+    if (nxt) {
+      const nome = FORNECEDORES[nxt].label.split(",")[0];
+      const ir = confirm("Guardado: " + getFornLabel().split(",")[0] + ".\n\nPassar ao próximo fornecedor?\n\n→ " + nome);
+      if (ir) {
+        currentForn = nxt;
+        document.getElementById("selectFornLoja").value = currentForn;
+        mudarFornecedorLoja();
+      }
+    } else {
+      alert("Guardado: " + getFornLabel().split(",")[0] + ".\n\nTodos os fornecedores desta sequência foram percorridos (ou é o último).");
+    }
   } catch (e) {
     alert("Erro: " + e.message);
   } finally {
     btn.disabled = false; btn.textContent = "Guardar online";
   }
 }
-function csvEsc(v) {
-  const s = String(v == null ? "" : v);
-  return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
-function buildCSVContent() {
-  const lines = [];
-  lines.push(["Loja", LOJAS[currentLoja]].join(";"));
-  lines.push(["Fornecedor", FORNECEDOR].join(";"));
-  lines.push(["Data Mapa", document.getElementById("dataMapa").value].join(";"));
-  lines.push(["Preenchido por", document.getElementById("preenchidoPor").value].join(";"));
-  lines.push(["Data Preenchimento", document.getElementById("dataPreenchimento").value].join(";"));
-  lines.push(["Observações", document.getElementById("obsGeral").value].join(";"));
-  lines.push("");
-  lines.push(["Artigo","Descrição","Stock Sistema","Vendas","Stock Real","Previsão","Alteração","Encomenda Final"].join(";"));
+function buildSheetAOA() {
+  const aoa = [];
+  aoa.push(["Loja", LOJAS[currentLoja]]);
+  aoa.push(["Fornecedor", getFornLabel()]);
+  aoa.push(["Lead time (dias)", leadTime]);
+  aoa.push(["Data Mapa", document.getElementById("dataMapa").value]);
+  aoa.push(["Preenchido por", document.getElementById("preenchidoPor").value]);
+  aoa.push(["Data Preenchimento", document.getElementById("dataPreenchimento").value]);
+  aoa.push(["Observações", document.getElementById("obsGeral").value]);
+  aoa.push([]);
+  aoa.push(["Artigo","Descrição","Stock Sistema","Vendas","Stock Real","Previsão","Alteração","Encomenda Final"]);
   document.querySelectorAll("#tbody tr").forEach(tr => {
-    lines.push([
-      tr.dataset.code, tr.querySelector(".desc").textContent,
-      tr.querySelector(".stock-sis").textContent, tr.querySelector(".vendas").textContent,
-      tr.querySelector(".stock-real").value, tr.querySelector("[data-prev]").textContent,
-      tr.querySelector(".alt-enc").value, (tr.querySelector("[data-final]") || {}).textContent || ""
-    ].map(csvEsc).join(";"));
+    aoa.push([
+      tr.dataset.code,
+      tr.querySelector(".desc").textContent,
+      tr.querySelector(".stock-sis").textContent,
+      tr.querySelector(".vendas").textContent,
+      tr.querySelector(".stock-real").value,
+      tr.querySelector("[data-prev]").textContent,
+      tr.querySelector(".alt-enc").value,
+      (tr.querySelector("[data-final]") || {}).textContent || ""
+    ]);
   });
-  return "\ufeff" + lines.join("\n");
+  return aoa;
 }
-function exportCSV() {
-  const blob = new Blob([buildCSVContent()], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "Mapa_Ribeiros_" + LOJAS[currentLoja].replace(/\s/g,"") + "_" + document.getElementById("dataMapa").value + ".csv";
-  a.click();
+function excelFileName() {
+  return "Mapa_" + currentForn + "_" + LOJAS[currentLoja].replace(/\s/g,"") + "_" + document.getElementById("dataMapa").value + ".xlsx";
 }
+function downloadExcel() {
+  const aoa = buildSheetAOA();
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [
+    {wch:12},{wch:45},{wch:12},{wch:10},{wch:12},{wch:10},{wch:10},{wch:14}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Mapa");
+  XLSX.writeFile(wb, excelFileName());
+  return excelFileName();
+}
+function exportCSV() { downloadExcel(); }
 function enviarEmail() {
-  const csv = buildCSVContent();
-  const nomeFicheiro = "Mapa_Ribeiros_" + LOJAS[currentLoja].replace(/\s/g,"") + "_" + document.getElementById("dataMapa").value + ".csv";
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = nomeFicheiro;
-  a.click();
+  const nomeFicheiro = downloadExcel();
   let totalFinal = 0, linhasComEnc = 0;
   document.querySelectorAll("#tbody tr").forEach(tr => {
     const f = (tr.querySelector("[data-final]") || {}).textContent;
@@ -796,21 +1134,24 @@ function enviarEmail() {
   });
   const por = document.getElementById("preenchidoPor").value || "(não indicado)";
   const obs = document.getElementById("obsGeral").value || "(sem observações)";
-  const assunto = "Mapa Ribeiros – " + LOJAS[currentLoja] + " – " + document.getElementById("dataMapa").value;
+  const assunto = "Mapa " + currentForn + " – " + LOJAS[currentLoja] + " – " + document.getElementById("dataMapa").value;
   const corpo =
-    "Bom dia,%0A%0ASegue o mapa Ribeiros preenchido.%0A%0A" +
+    "Bom dia,%0A%0ASegue o mapa preenchido.%0A%0A" +
+    "Fornecedor: " + encodeURIComponent(getFornLabel()) + "%0A" +
     "Loja: " + LOJAS[currentLoja] + "%0A" +
     "Data: " + document.getElementById("dataMapa").value + "%0A" +
     "Preenchido por: " + encodeURIComponent(por) + "%0A" +
     "Artigos com encomenda: " + linhasComEnc + "%0A" +
     "Soma Encomenda Final: " + totalFinal + "%0A" +
     "Observações: " + encodeURIComponent(obs) + "%0A%0A" +
-    "Anexe o ficheiro CSV descarregado: " + nomeFicheiro + "%0A%0AObrigado.";
+    "Anexe o ficheiro Excel que acabou de ser descarregado:%0A" +
+    nomeFicheiro + "%0A%0AObrigado.";
   setTimeout(() => {
     window.location.href = "mailto:nuno.justino@coopsintra.pt?subject=" + encodeURIComponent(assunto) + "&body=" + corpo;
-  }, 400);
+  }, 500);
 }
 
+fillFornSelects();
 (function init() {
   const id = getUrlBlobId();
   if (id) document.getElementById("blobIdInput").value = id;
