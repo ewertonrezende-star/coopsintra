@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa Stock – Cooperativa Agrícola de Sintra</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --primary: #1a5f2a;
+  --primary-dark: #144a20;
+  --accent: #fff3cd;
+  --border: #c8d6c9;
+  --bg: #f0f3f0;
+  --card: #fff;
+  --text: #1a1a1a;
+  --muted: #666;
+  --danger: #c62828;
+  --ok: #2e7d32;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+}
+/* ---- Login / Home ---- */
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: block; }
+.login-wrap {
+  max-width: 480px;
+  margin: 60px auto;
+  padding: 0 16px;
+}
+.login-card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 32px 28px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.08);
+  border: 1px solid var(--border);
+}
+.login-card h1 {
+  font-size: 20px;
+  color: var(--primary);
+  margin-bottom: 6px;
+}
+.login-card .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+.role-btns { display: flex; flex-direction: column; gap: 12px; }
+.role-btn {
+  padding: 16px 20px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, background .15s;
+}
+.role-btn:hover { border-color: var(--primary); background: #f5faf5; }
+.role-btn strong { display: block; font-size: 15px; color: var(--primary); margin-bottom: 4px; }
+.role-btn span { font-size: 12px; color: var(--muted); }
+.loja-select-wrap { margin-top: 16px; display: none; }
+.loja-select-wrap label { font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px; }
+select, input[type="text"], input[type="date"], input[type="password"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+}
+.btn {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { background: #e8e8e8; color: #333; }
+.btn-secondary:hover { background: #ddd; }
+.btn-export { background: #1565c0; color: #fff; }
+.btn-danger { background: #fff; color: var(--danger); border: 1px solid var(--danger); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---- App shell ---- */
+.topbar {
+  background: var(--primary);
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.topbar h2 { font-size: 16px; font-weight: 700; }
+.topbar .meta { font-size: 12px; opacity: .9; }
+.topbar-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.content { padding: 16px; max-width: 1200px; margin: 0 auto; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+.card h3 { font-size: 14px; color: var(--primary); margin-bottom: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.field { flex: 1; min-width: 140px; }
+.field label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.status {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: inline-block;
+}
+.status.ok { background: #c8e6c9; color: #1b5e20; }
+.status.warn { background: #fff3cd; color: #856404; }
+.status.err { background: #ffcdd2; color: #b71c1c; }
+.status.info { background: #e3f2fd; color: #0d47a1; }
+
+.obs-box label { font-weight: 600; font-size: 12px; color: var(--primary); display: block; margin-bottom: 4px; }
+.obs-box textarea {
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+table { width: 100%; border-collapse: collapse; min-width: 800px; }
+thead th {
+  background: var(--primary);
+  color: #fff;
+  padding: 8px 6px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  white-space: nowrap;
+}
+tbody td { padding: 5px 6px; border-bottom: 1px solid #eee; vertical-align: middle; }
+tbody tr:nth-child(even) { background: #f9fbf9; }
+tbody tr.has-diff { background: #fff8e1 !important; }
+.code { font-family: Consolas, monospace; font-size: 12px; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+input.stock-real, input.alt-enc {
+  width: 78px;
+  padding: 4px 6px;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  font-size: 13px;
+  text-align: right;
+}
+input.stock-real { background: var(--accent); border-color: #e0c060; font-weight: 600; }
+input.alt-enc:disabled { background: #f0f0f0; color: #999; }
+.prev { font-weight: 700; color: var(--primary); }
+.prev.zero { color: #999; font-weight: 400; }
+
+.footer-bar {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.footer-bar label { font-size: 11px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 3px; }
+.count-info { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+.admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.loja-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fafcfa;
+}
+.loja-card h4 { font-size: 14px; margin-bottom: 8px; color: var(--primary); }
+.loja-card .tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.tag.ok { background: #c8e6c9; color: #1b5e20; }
+.tag.warn { background: #fff3cd; color: #856404; }
+.loja-card input[type="file"] { font-size: 12px; margin-bottom: 8px; width: 100%; }
+
+@media print {
+  .topbar-actions, .btn, input[type="file"], .admin-only { display: none !important; }
+  body { background: #fff; }
+  thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<!-- ========== ECRÃ INICIAL ========== -->
+<div id="screenHome" class="screen active">
+  <div class="login-wrap">
+    <div class="login-card">
+      <h1>Cooperativa Agrícola de Sintra</h1>
+      <p class="sub">Mapa de Validação de Stock · Ribeiros (teste online)</p>
+      <div class="role-btns">
+        <button class="role-btn" onclick="entrarCentral()">
+          <strong>Central / Compras</strong>
+          <span>Carregar vendas e publicar dados para as lojas</span>
+        </button>
+        <button class="role-btn" onclick="mostrarLojaSelect()">
+          <strong>Loja</strong>
+          <span>Abrir mapa, preencher stock real e devolver</span>
+        </button>
+      </div>
+      <div class="loja-select-wrap" id="lojaSelectWrap">
+        <label>Selecionar loja</label>
+        <select id="selectLojaHome">
+          <option value="AL">Albarraque</option>
+          <option value="AM">Arneiro Marinheiro</option>
+          <option value="CO">Colares</option>
+          <option value="MM">Mem Martins</option>
+          <option value="LC" selected>Sintra</option>
+          <option value="SA">Sabugo</option>
+        </select>
+        <button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="entrarLoja()">Abrir mapa da loja</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== CENTRAL ========== -->
+<div id="screenCentral" class="screen">
+  <div class="topbar">
+    <div>
+      <h2>Central · Publicar dados</h2>
+      <div class="meta">Ribeiros – Ind e Com de Cereais, Imp e Exp., S.A. · Lead time 15 dias</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-secondary" onclick="voltarHome()">Sair</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="card">
+      <h3>1. Carregar ficheiro de vendas por loja</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+        Colunas esperadas: Artigo | Descrição | STK.Actual | N-2 | N-1 | Vendas Corrente.
+        Depois de carregar, os dados ficam publicados para essa loja (neste browser / neste PC de teste).
+      </p>
+      <div class="admin-grid" id="adminGrid"></div>
+    </div>
+    <div class="card">
+      <h3>2. Estado das publicações</h3>
+      <div id="pubStatus" class="status info">Nenhuma loja com dados publicados ainda.</div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px">
+        <strong>Como testar:</strong> carrega o Excel de uma loja → abre outra janela/separador → entra como <em>Loja</em> e escolhe a mesma loja → os dados já aparecem.
+        (Neste teste os dados ficam neste browser. Em produção ficariam no servidor.)
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ========== LOJA ========== -->
+<div id="screenLoja" class="screen">
+  <div class="topbar">
+    <div>
+      <h2>Mapa Ribeiros · <span id="lojaNomeTitulo">Sintra</span></h2>
+      <div class="meta">Ribeiros - Ind e Com de Cereais, Imp e Exp., S.A. · Lead time 15 dias</div>
+    </div>
+    <div class="topbar-actions">
+      <span id="lojaDataStatus" class="status warn">Sem dados</span>
+      <button class="btn btn-secondary" onclick="window.print()">Imprimir</button>
+      <button class="btn btn-export" onclick="exportCSV()">Exportar CSV</button>
+      <button class="btn btn-secondary" onclick="voltarHome()">Sair</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="card">
+      <div class="row">
+        <div class="field">
+          <label>Data do Mapa</label>
+          <input type="date" id="dataMapa">
+        </div>
+        <div class="field">
+          <label>Próximo Mapa</label>
+          <input type="date" id="proximoMapa">
+        </div>
+      </div>
+    </div>
+    <div class="card obs-box">
+      <label>Observações (artigos não listados ou notas gerais)</label>
+      <textarea id="obsGeral" placeholder="Ex.: artigo em falta na lista; notas da contagem..."></textarea>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:90px">Artigo</th>
+            <th>Descrição</th>
+            <th style="width:70px">Stock Sistema</th>
+            <th style="width:70px">Vendas</th>
+            <th style="width:80px">Stock Real</th>
+            <th style="width:90px">Previsão</th>
+            <th style="width:90px">Alteração</th>
+            <th style="width:90px">Encomenda Final</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="footer-bar">
+      <div>
+        <label>Preenchido por</label>
+        <input type="text" id="preenchidoPor" placeholder="Nome" style="width:200px">
+      </div>
+      <div>
+        <label>Data</label>
+        <input type="date" id="dataPreenchimento" style="width:150px">
+      </div>
+      <button class="btn btn-primary" onclick="guardarResposta()">Guardar resposta da loja</button>
+      <button class="btn btn-export" onclick="exportCSV()">Exportar Excel (CSV)</button>
+      <button class="btn btn-primary" style="background:#6a1b9a" onclick="enviarEmail()">Enviar por email</button>
+      <div class="count-info">
+        <span id="countArtigos">0</span> artigos ·
+        Preenchidos: <span id="countPreenchidos">0</span> ·
+        Alterações: <span id="countAlteracao">0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const LEAD_TIME = 15;
+const FORNECEDOR = "Ribeiros - Ind e Com de Cereais, Imp e Exp., S.A.";
+const STORAGE_KEY = "cas_mapa_ribeiros_v1";
+
+const LOJAS = {
+  AL: "Albarraque",
+  AM: "Arneiro Marinheiro",
+  CO: "Colares",
+  MM: "Mem Martins",
+  LC: "Sintra",
+  SA: "Sabugo"
+};
+
+const ARTIGOS = [
+  {c:"10100006",d:"Farinha de Milho 25kg (ribeiros)"},
+  {c:"10100029",d:"Alimpadura de Trigo 5kg (ribeiros)"},
+  {c:"10100031",d:"Alimpadura de Trigo 25kg (ribeiros)"},
+  {c:"10100041",d:"Soja 44 sacos 25kg (ribeiros)"},
+  {c:"10200006",d:"Alpista do Canada 1kg (Ribeiros)"},
+  {c:"10200007",d:"Alpista do Canada 20kg (Ribeiros)"},
+  {c:"10300008",d:"Aveia 4kg (Ribeiros)"},
+  {c:"10300102",d:"Aveia 25kg (Ribeiros)"},
+  {c:"10300103",d:"Aveia 20kg (Ribeiros)"},
+  {c:"10300104",d:"Aveia 15kg (Ribeiros)"},
+  {c:"10400050",d:"Cevada Ração 5kg (ribeiros)"},
+  {c:"10400052",d:"Cevada Ração 25kg (ribeiros)"},
+  {c:"10500033",d:"Faveca 30kg (ribeiros)"},
+  {c:"10500034",d:"Faveca 25kg (ribeiros)"},
+  {c:"10600021",d:"Milho Grado 5kg (Ribeiros)"},
+  {c:"10600100",d:"Milho Medio 30kg (ribeiros)"},
+  {c:"10600103",d:"Milho Medio 5kg (Ribeiros)"},
+  {c:"10600104",d:"Milho Partido 5kg (ribeiros)"},
+  {c:"10600105",d:"Milho Partido 25kg (ribeiros)"},
+  {c:"10600106",d:"Milho Grado 25kg (ribeiros)"},
+  {c:"10600107",d:"Milho Medio 25kg (ribeiros)"},
+  {c:"10800030",d:"Farelo de Trigo 25kg (ribeiros)"},
+  {c:"10900007",d:"Alfarroba triturado grado 15kg (ribeiros)"},
+  {c:"20810013",d:"Luzerna granulada 25kg (ribeiros)"},
+  {c:"81103822",d:"Areia p/gatos perfumada \"Saint Bernard\" 5kg"},
+  {c:"81109001",d:"Mistura p/canarios 1kg (ribeiros)"},
+  {c:"81109002",d:"Mistura p/canarios 5kg (ribeiros)"},
+  {c:"81109004",d:"Mistura p/caturras 1kg (ribeiros)"},
+  {c:"81109005",d:"Mistura p/caturras 5kg (ribeiros)"},
+  {c:"81109007",d:"Mistura p/passaros exoticos 1kg (ribeiros)"},
+  {c:"81109008",d:"Mistura p/papagaios 1kg (ribeiros)"},
+  {c:"81109009",d:"Mistura p/periquitos 1kg (ribeiros)"},
+  {c:"81109010",d:"Mistura p/periquitos 5kg (ribeiros)"},
+  {c:"81109011",d:"Mistura p/periquitos 25kg (ribeiros)"},
+  {c:"81109012",d:"Lote cereais pintos 5kg (ribeiros)"},
+  {c:"81109013",d:"Lote cereais pintos 25kg (ribeiros)"},
+  {c:"81109014",d:"Mistura aves galinh/frg/patos 5kg (ribeiros)"},
+  {c:"81109015",d:"Mistura aves galinh/frg/patos 25kg (ribeiros)"},
+  {c:"81109017",d:"trinca de arroz 5kg (ribeiros)"},
+  {c:"81109019",d:"Areia p/gato perfumada 5kg (ribeiros)"},
+  {c:"81109020",d:"Mistura p/caturras 20kg (ribeiros)"},
+  {c:"81109021",d:"Mistura p/papagaios 15kg (ribeiros)"},
+  {c:"81109024",d:"Mistura aves galinh/frg/patos 30kg (ribeiros)"},
+  {c:"81109025",d:"Mistura cereais coelhos 25kg (Ribeiros)"},
+  {c:"81109026",d:"Mistura p/periquitos sacos 20kg (ribeiros)"},
+  {c:"81109027",d:"Mistura p/papagaios sacos 5kg (ribeiros)"},
+  {c:"81109028",d:"Mistura p/passaros exoticos 5kg (ribeiros)"},
+  {c:"81109029",d:"Mistura p/canarios 20kg (ribeiros)"},
+  {c:"81109030",d:"Girassol branco 500gr (ribeiros)"},
+  {c:"81109031",d:"Mistura cereais corrente 5kg (ribeiros)"},
+  {c:"81109032",d:"Mistura cereais corrente 25kg (ribeiros)"},
+  {c:"81109033",d:"Girassol raiado grado 4kg (ribeiros)"},
+  {c:"81109034",d:"Mistura p/papagaios 750Gr  (ribeiros)"},
+  {c:"81109035",d:"Mistura cereais coelhos 5kg (Ribeiros)"},
+  {c:"81109036",d:"Mistura cereais p/ovinos 30kg (ribeiros)"},
+  {c:"81109037",d:"Mistura cereais p/ovinos 25kg (ribeiros)"},
+  {c:"81109038",d:"Mistura p/passaros exoticos 20kg (ribeiros)"},
+  {c:"81109039",d:"Girassol raiado miudo 500gr (ribeiros)"},
+  {c:"81109040",d:"Lote cereais pintos 30kg (ribeiros)"},
+  {c:"81109042",d:"Mistura p/papagaios 12,5kg (ribeiros)"},
+  {c:"81109043",d:"Mistura p/papagaios 3kg (ribeiros)"},
+  {c:"81109045",d:"Massa p/caes 3kg (ribeiros)"},
+  {c:"81109046",d:"Areia p/gatos normal s/cheiro 5kg"},
+  {c:"81109047",d:"Massa p/caes 5kg (ribeiros)"},
+  {c:"81109048",d:"Casca de Ostra 1,5Kg (Ribeiros)"},
+  {c:"81109050",d:"Trinca de arroz 30kg (ribeiros)"},
+  {c:"81109051",d:"Aglomerado p/gato Nuthya Bentonita 4kg"},
+  {c:"81109053",d:"Trinca de arroz 25kg (ribeiros)"},
+  {c:"81109054",d:"Aglomerado cat jet aroma lavanda 5lt bentonita"},
+  {c:"81109055",d:"Aglomerado cat jet aroma po talco 5lt bentonita"},
+  {c:"81109056",d:"Aglomerado cat jet aroma sabao marselha 5lt benton"},
+  {c:"81109057",d:"Aglomerado cat jet carvao ativo 20lt bentonita"},
+  {c:"81109058",d:"Mistura Cereais p/cavalos 25kg (ribeiros)"},
+  {c:"81109059",d:"Mistura p/ruminantes 25kg (ribeiros)"},
+  {c:"81109060",d:"Girassol preto emb 750gr (ribeiros)"},
+  {c:"81109061",d:"Girassol preto saq 5kg (ribeiros)"},
+  {c:"81109062",d:"Mistura p/papagaios 600Gr  (ribeiros)"},
+  {c:"81109063",d:"Mistura para Agapornis 1kg (ribeiros)"},
+  {c:"81109064",d:"Girassol preto saco 15kg (ribeiros)"},
+  {c:"81109065",d:"Girassol branco 5kg (ribeiros)"},
+  {c:"81109066",d:"Mistura para ruminantes melaçada 25kg (ribeiros)"},
+  {c:"81109101",d:"Mistura p/cavalos Ribmix saco 30kg (ribeiros)"},
+  {c:"81109105",d:"Mistura p/cavalos Ribmix saco 25kg (ribeiros)"},
+  {c:"81109300",d:"Teycat chicken (frango) 415gr"},
+  {c:"81109301",d:"Teycat beef (vaca) 415gr"},
+  {c:"81109302",d:"Teycat salmon (salmao) 415gr"},
+  {c:"81109303",d:"Teycat tuna (atum) 415gr"},
+  {c:"81109310",d:"Teycan chicken (frango) 415gr"},
+  {c:"81109311",d:"Teycan beef (vaca) 415gr"},
+  {c:"81109320",d:"Petcool cao frango 1250gr"},
+  {c:"81109321",d:"Petcool cao vaca 1250gr"},
+  {c:"81109325",d:"Petcool gato pato 405gr"},
+  {c:"81109326",d:"Petcool gato atum 405gr"},
+  {c:"82002006",d:"Aparas madeira 20kg (ribeiros)"},
+  {c:"82002011",d:"Aparas madeira 500 LT (ribeiros) (14kg)"}
+];
+
+let currentLoja = "LC";
+let stockData = {}; // code -> {stock, vendas}
+
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function addDays(iso, n) {
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function loadStore() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  } catch { return {}; }
+}
+function saveStore(obj) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+}
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+function voltarHome() {
+  showScreen("screenHome");
+  document.getElementById("lojaSelectWrap").style.display = "none";
+}
+
+function mostrarLojaSelect() {
+  document.getElementById("lojaSelectWrap").style.display = "block";
+}
+
+function entrarCentral() {
+  showScreen("screenCentral");
+  renderAdminGrid();
+  updatePubStatus();
+}
+
+function entrarLoja() {
+  currentLoja = document.getElementById("selectLojaHome").value;
+  document.getElementById("lojaNomeTitulo").textContent = LOJAS[currentLoja];
+  document.getElementById("dataMapa").value = todayISO();
+  document.getElementById("proximoMapa").value = addDays(todayISO(), 7);
+  document.getElementById("dataPreenchimento").value = todayISO();
+  document.getElementById("obsGeral").value = "";
+  document.getElementById("preenchidoPor").value = "";
+
+  // Carregar dados publicados para esta loja
+  const store = loadStore();
+  const pub = store[currentLoja];
+  if (pub && pub.stockData) {
+    stockData = pub.stockData;
+    document.getElementById("lojaDataStatus").textContent =
+      "Dados de " + (pub.updatedAt || "—") + " · " + Object.keys(stockData).length + " linhas";
+    document.getElementById("lojaDataStatus").className = "status ok";
+    if (pub.dataMapa) document.getElementById("dataMapa").value = pub.dataMapa;
+  } else {
+    stockData = {};
+    document.getElementById("lojaDataStatus").textContent = "Sem dados publicados para esta loja";
+    document.getElementById("lojaDataStatus").className = "status warn";
+  }
+
+  // Restaurar preenchimento anterior se existir
+  if (pub && pub.resposta) {
+    // será aplicado após render
+  }
+
+  showScreen("screenLoja");
+  renderTable();
+
+  if (pub && pub.resposta) {
+    applyResposta(pub.resposta);
+  }
+}
+
+/* ---- Central: upload por loja ---- */
+function renderAdminGrid() {
+  const grid = document.getElementById("adminGrid");
+  grid.innerHTML = "";
+  const store = loadStore();
+  Object.keys(LOJAS).forEach(code => {
+    const pub = store[code];
+    const div = document.createElement("div");
+    div.className = "loja-card";
+    const hasData = pub && pub.stockData && Object.keys(pub.stockData).length > 0;
+    div.innerHTML = `
+      <h4>${LOJAS[code]}</h4>
+      <span class="tag ${hasData ? "ok" : "warn"}">${hasData ? "Publicado · " + (pub.updatedAt || "") : "Sem dados"}</span>
+      <input type="file" accept=".xlsx,.xls,.csv" data-loja="${code}">
+      <div style="font-size:11px;color:var(--muted)" id="msg-${code}">
+        ${hasData ? Object.keys(pub.stockData).length + " artigos com dados" : "Carregar ficheiro de vendas"}
+      </div>
+    `;
+    grid.appendChild(div);
+    div.querySelector("input[type=file]").addEventListener("change", (e) => onAdminFile(e, code));
+  });
+}
+
+function onAdminFile(e, lojaCode) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const msg = document.getElementById("msg-" + lojaCode);
+  msg.textContent = "A processar...";
+
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      const parsed = parseVendas(rows);
+      const store = loadStore();
+      if (!store[lojaCode]) store[lojaCode] = {};
+      store[lojaCode].stockData = parsed;
+      store[lojaCode].updatedAt = todayISO() + " " + new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+      store[lojaCode].dataMapa = todayISO();
+      store[lojaCode].fileName = file.name;
+      // manter resposta anterior se existir
+      saveStore(store);
+      msg.textContent = Object.keys(parsed).length + " linhas publicadas · " + file.name;
+      updatePubStatus();
+      renderAdminGrid();
+    } catch (err) {
+      msg.textContent = "Erro: " + err.message;
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseVendas(rows) {
+  const out = {};
+  for (const row of rows) {
+    if (!row || row.length < 3) continue;
+    const code = String(row[0] || "").trim();
+    if (!/^\d{5,}/.test(code)) continue;
+    const stock = parseNum(row[2]);
+    let vendas = null;
+    if (row.length > 5 && row[5] !== "" && row[5] !== undefined) {
+      vendas = parseNum(row[5]);
+    } else {
+      vendas = parseNum(row[row.length - 1]);
+    }
+    out[code] = { stock, vendas };
+  }
+  return out;
+}
+
+function parseNum(v) {
+  if (v === "" || v === null || v === undefined) return null;
+  if (typeof v === "number") return v;
+  const n = parseFloat(String(v).replace(",", ".").replace(/\s/g, ""));
+  return isNaN(n) ? null : n;
+}
+
+function updatePubStatus() {
+  const store = loadStore();
+  const parts = [];
+  Object.keys(LOJAS).forEach(c => {
+    const p = store[c];
+    if (p && p.stockData && Object.keys(p.stockData).length) {
+      parts.push(LOJAS[c] + " (" + Object.keys(p.stockData).length + ")");
+    }
+  });
+  const el = document.getElementById("pubStatus");
+  if (parts.length === 0) {
+    el.textContent = "Nenhuma loja com dados publicados ainda.";
+    el.className = "status info";
+  } else {
+    el.textContent = "Publicado: " + parts.join(" · ");
+    el.className = "status ok";
+  }
+}
+
+/* ---- Loja: tabela e cálculos ---- */
+function calcPrevisao(stockUsado, vendas) {
+  const v = Number(vendas);
+  const s = Number(stockUsado);
+  if (isNaN(s)) return null;
+  const vendasNum = isNaN(v) ? 0 : v;
+  return Math.max(0, Math.ceil((vendasNum / 30) * LEAD_TIME - s));
+}
+
+function renderTable() {
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  ARTIGOS.forEach(art => {
+    const d = stockData[art.c] || {};
+    const stockSis = d.stock != null ? d.stock : "";
+    const vendas = d.vendas != null ? d.vendas : "";
+    const tr = document.createElement("tr");
+    tr.dataset.code = art.c;
+
+    function td(cls, text) {
+      const el = document.createElement("td");
+      if (cls) el.className = cls;
+      el.textContent = text;
+      return el;
+    }
+
+    tr.appendChild(td("code", art.c));
+    tr.appendChild(td("desc", art.d));
+    tr.appendChild(td("num stock-sis", stockSis !== "" ? stockSis : "—"));
+    tr.appendChild(td("num vendas", vendas !== "" ? vendas : "—"));
+
+    const tdReal = document.createElement("td");
+    const inpReal = document.createElement("input");
+    inpReal.type = "number";
+    inpReal.className = "stock-real";
+    inpReal.step = "any";
+    tdReal.appendChild(inpReal);
+    tr.appendChild(tdReal);
+
+    const tdPrev = document.createElement("td");
+    tdPrev.className = "num prev zero";
+    tdPrev.dataset.prev = "1";
+    tdPrev.textContent = "—";
+    tr.appendChild(tdPrev);
+
+    const tdAlt = document.createElement("td");
+    const inpAlt = document.createElement("input");
+    inpAlt.type = "number";
+    inpAlt.className = "alt-enc";
+    inpAlt.step = "any";
+    inpAlt.disabled = true;
+    inpAlt.placeholder = "—";
+    tdAlt.appendChild(inpAlt);
+    tr.appendChild(tdAlt);
+
+    const tdFinal = document.createElement("td");
+    tdFinal.className = "num prev zero";
+    tdFinal.dataset.final = "1";
+    tdFinal.textContent = "—";
+    tr.appendChild(tdFinal);
+
+    tbody.appendChild(tr);
+  });
+  document.getElementById("countArtigos").textContent = ARTIGOS.length;
+  bindInputs();
+  updateAllPrevisoes();
+  updateCounts();
+}
+
+function bindInputs() {
+  document.querySelectorAll(".stock-real").forEach(inp => {
+    inp.addEventListener("input", onStockRealChange);
+    inp.addEventListener("change", onStockRealChange);
+  });
+  document.querySelectorAll(".alt-enc").forEach(inp => {
+    inp.addEventListener("input", (e) => {
+      updateEncomendaFinal(e.target.closest("tr"));
+      updateCounts();
+    });
+  });
+}
+
+function onStockRealChange(e) {
+  const tr = e.target.closest("tr");
+  if (!tr) return;
+  const alt = tr.querySelector(".alt-enc");
+  const val = e.target.value.trim();
+  if (val !== "") {
+    alt.disabled = false;
+    alt.placeholder = "";
+  } else {
+    alt.disabled = true;
+    alt.value = "";
+    alt.placeholder = "—";
+  }
+  updatePrevisaoRow(tr);
+  updateCounts();
+  const sis = tr.querySelector(".stock-sis").textContent;
+  if (val !== "" && sis !== "—" && Number(val) !== Number(sis)) {
+    tr.classList.add("has-diff");
+  } else {
+    tr.classList.remove("has-diff");
+  }
+}
+
+function updatePrevisaoRow(tr) {
+  const stockSisTxt = tr.querySelector(".stock-sis").textContent.trim();
+  const vendasTxt = tr.querySelector(".vendas").textContent.trim();
+  const stockRealVal = tr.querySelector(".stock-real").value.trim();
+  const prevCell = tr.querySelector("[data-prev]");
+  let stockUsado = null;
+  if (stockRealVal !== "") stockUsado = Number(stockRealVal);
+  else if (stockSisTxt !== "—" && stockSisTxt !== "") stockUsado = Number(stockSisTxt);
+  const vendas = (vendasTxt !== "—" && vendasTxt !== "") ? Number(vendasTxt) : 0;
+  if (stockUsado === null || isNaN(stockUsado)) {
+    prevCell.textContent = "—";
+    prevCell.className = "num prev zero";
+    return;
+  }
+  const p = calcPrevisao(stockUsado, vendas);
+  prevCell.textContent = p === null ? "—" : p;
+  prevCell.className = "num prev" + (p === 0 || p === null ? " zero" : "");
+  updateEncomendaFinal(tr);
+}
+
+function updateEncomendaFinal(tr) {
+  const prevCell = tr.querySelector("[data-prev]");
+  const finalCell = tr.querySelector("[data-final]");
+  if (!finalCell) return;
+  const altVal = tr.querySelector(".alt-enc").value.trim();
+  let finalVal;
+  if (altVal !== "") {
+    finalVal = Number(altVal);
+    if (isNaN(finalVal)) finalVal = null;
+  } else {
+    const prevTxt = prevCell.textContent.trim();
+    finalVal = (prevTxt === "—" || prevTxt === "") ? null : Number(prevTxt);
+  }
+  if (finalVal === null || isNaN(finalVal)) {
+    finalCell.textContent = "—";
+    finalCell.className = "num prev zero";
+  } else {
+    finalCell.textContent = finalVal;
+    finalCell.className = "num prev" + (finalVal === 0 ? " zero" : "");
+  }
+}
+
+function updateAllPrevisoes() {
+  document.querySelectorAll("#tbody tr").forEach(updatePrevisaoRow);
+}
+
+function updateCounts() {
+  let p = 0, a = 0;
+  document.querySelectorAll(".stock-real").forEach(i => { if (i.value.trim() !== "") p++; });
+  document.querySelectorAll(".alt-enc").forEach(i => { if (!i.disabled && i.value.trim() !== "") a++; });
+  document.getElementById("countPreenchidos").textContent = p;
+  document.getElementById("countAlteracao").textContent = a;
+}
+
+function collectResposta() {
+  const rows = [];
+  document.querySelectorAll("#tbody tr").forEach(tr => {
+    rows.push({
+      c: tr.dataset.code,
+      real: tr.querySelector(".stock-real").value,
+      alt: tr.querySelector(".alt-enc").value,
+      prev: tr.querySelector("[data-prev]").textContent,
+      final: (tr.querySelector("[data-final]") || {textContent:""}).textContent
+    });
+  });
+  return {
+    preenchidoPor: document.getElementById("preenchidoPor").value,
+    dataPreenchimento: document.getElementById("dataPreenchimento").value,
+    obs: document.getElementById("obsGeral").value,
+    dataMapa: document.getElementById("dataMapa").value,
+    rows
+  };
+}
+
+function applyResposta(resp) {
+  if (!resp) return;
+  if (resp.preenchidoPor) document.getElementById("preenchidoPor").value = resp.preenchidoPor;
+  if (resp.dataPreenchimento) document.getElementById("dataPreenchimento").value = resp.dataPreenchimento;
+  if (resp.obs) document.getElementById("obsGeral").value = resp.obs;
+  if (resp.dataMapa) document.getElementById("dataMapa").value = resp.dataMapa;
+  if (!resp.rows) return;
+  const map = {};
+  resp.rows.forEach(r => { map[r.c] = r; });
+  document.querySelectorAll("#tbody tr").forEach(tr => {
+    const r = map[tr.dataset.code];
+    if (!r) return;
+    const inpReal = tr.querySelector(".stock-real");
+    const inpAlt = tr.querySelector(".alt-enc");
+    if (r.real) {
+      inpReal.value = r.real;
+      inpAlt.disabled = false;
+      inpAlt.placeholder = "";
+      if (r.alt) inpAlt.value = r.alt;
+      onStockRealChange({ target: inpReal });
+    }
+  });
+  updateCounts();
+}
+
+function guardarResposta() {
+  const store = loadStore();
+  if (!store[currentLoja]) store[currentLoja] = {};
+  store[currentLoja].resposta = collectResposta();
+  store[currentLoja].respostaAt = todayISO() + " " + new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+  saveStore(store);
+  alert("Resposta guardada neste dispositivo.\nPode também Exportar CSV para enviar à central.");
+}
+
+function exportCSV() {
+  const lines = [];
+  lines.push(["Loja", LOJAS[currentLoja]].join(";"));
+  lines.push(["Fornecedor", FORNECEDOR].join(";"));
+  lines.push(["Data Mapa", document.getElementById("dataMapa").value].join(";"));
+  lines.push(["Preenchido por", document.getElementById("preenchidoPor").value].join(";"));
+  lines.push(["Data Preenchimento", document.getElementById("dataPreenchimento").value].join(";"));
+  lines.push(["Observações", document.getElementById("obsGeral").value].join(";"));
+  lines.push("");
+  lines.push(["Artigo", "Descrição", "Stock Sistema", "Vendas", "Stock Real", "Previsão", "Alteração", "Encomenda Final"].join(";"));
+  document.querySelectorAll("#tbody tr").forEach(tr => {
+    lines.push([
+      tr.dataset.code,
+      tr.querySelector(".desc").textContent,
+      tr.querySelector(".stock-sis").textContent,
+      tr.querySelector(".vendas").textContent,
+      tr.querySelector(".stock-real").value,
+      tr.querySelector("[data-prev]").textContent,
+      tr.querySelector(".alt-enc").value,
+      (tr.querySelector("[data-final]") || {textContent:""}).textContent
+    ].map(csvEsc).join(";"));
+  });
+  const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "Mapa_Ribeiros_" + LOJAS[currentLoja].replace(/\s/g, "") + "_" + document.getElementById("dataMapa").value + ".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+
+function buildCSVContent() {
+  const lines = [];
+  lines.push(["Loja", LOJAS[currentLoja]].join(";"));
+  lines.push(["Fornecedor", FORNECEDOR].join(";"));
+  lines.push(["Data Mapa", document.getElementById("dataMapa").value].join(";"));
+  lines.push(["Preenchido por", document.getElementById("preenchidoPor").value].join(";"));
+  lines.push(["Data Preenchimento", document.getElementById("dataPreenchimento").value].join(";"));
+  lines.push(["Observações", document.getElementById("obsGeral").value].join(";"));
+  lines.push("");
+  lines.push(["Artigo", "Descrição", "Stock Sistema", "Vendas", "Stock Real", "Previsão", "Alteração", "Encomenda Final"].join(";"));
+  document.querySelectorAll("#tbody tr").forEach(tr => {
+    lines.push([
+      tr.dataset.code,
+      tr.querySelector(".desc").textContent,
+      tr.querySelector(".stock-sis").textContent,
+      tr.querySelector(".vendas").textContent,
+      tr.querySelector(".stock-real").value,
+      tr.querySelector("[data-prev]").textContent,
+      tr.querySelector(".alt-enc").value,
+      (tr.querySelector("[data-final]") || {textContent:""}).textContent
+    ].map(csvEsc).join(";"));
+  });
+  return "\ufeff" + lines.join("\n");
+}
+
+function enviarEmail() {
+  // 1) Descarrega o CSV para anexar
+  const csv = buildCSVContent();
+  const nomeFicheiro = "Mapa_Ribeiros_" + LOJAS[currentLoja].replace(/\s/g, "") + "_" + document.getElementById("dataMapa").value + ".csv";
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nomeFicheiro;
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  // 2) Resumo no corpo do email
+  let totalFinal = 0;
+  let linhasComEnc = 0;
+  document.querySelectorAll("#tbody tr").forEach(tr => {
+    const f = (tr.querySelector("[data-final]") || {}).textContent;
+    if (f && f !== "—" && Number(f) > 0) {
+      totalFinal += Number(f);
+      linhasComEnc++;
+    }
+  });
+  const por = document.getElementById("preenchidoPor").value || "(não indicado)";
+  const obs = document.getElementById("obsGeral").value || "(sem observações)";
+  const assunto = "Mapa Ribeiros – " + LOJAS[currentLoja] + " – " + document.getElementById("dataMapa").value;
+  const corpo =
+    "Bom dia,%0A%0A" +
+    "Segue o mapa de validação de stock Ribeiros preenchido.%0A%0A" +
+    "Loja: " + LOJAS[currentLoja] + "%0A" +
+    "Data do mapa: " + document.getElementById("dataMapa").value + "%0A" +
+    "Preenchido por: " + encodeURIComponent(por) + "%0A" +
+    "Artigos com encomenda: " + linhasComEnc + "%0A" +
+    "Soma Encomenda Final: " + totalFinal + "%0A" +
+    "Observações: " + encodeURIComponent(obs) + "%0A%0A" +
+    "Por favor anexe o ficheiro CSV que acabou de ser descarregado:%0A" +
+    nomeFicheiro + "%0A%0A" +
+    "Obrigado.";
+
+  const mailto = "mailto:nuno.justino@coopsintra.pt?subject=" + encodeURIComponent(assunto) + "&body=" + corpo;
+  // pequeno atraso para o download iniciar antes do cliente de email
+  setTimeout(function() {
+    window.location.href = mailto;
+  }, 400);
+}
+
+function csvEsc(v) {
+  const s = String(v == null ? "" : v);
+  if (/[;"\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+</script>
+</body>
+</html>
