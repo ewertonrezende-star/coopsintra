@@ -1125,30 +1125,66 @@ function downloadExcel() {
   return excelFileName();
 }
 function exportCSV() { downloadExcel(); }
-function enviarEmail() {
-  const nomeFicheiro = downloadExcel();
-  let totalFinal = 0, linhasComEnc = 0;
-  document.querySelectorAll("#tbody tr").forEach(tr => {
-    const f = (tr.querySelector("[data-final]") || {}).textContent;
-    if (f && f !== "—" && Number(f) > 0) { totalFinal += Number(f); linhasComEnc++; }
-  });
-  const por = document.getElementById("preenchidoPor").value || "(não indicado)";
-  const obs = document.getElementById("obsGeral").value || "(sem observações)";
-  const assunto = "Mapa " + currentForn + " – " + LOJAS[currentLoja] + " – " + document.getElementById("dataMapa").value;
-  const corpo =
-    "Bom dia,%0A%0ASegue o mapa preenchido.%0A%0A" +
-    "Fornecedor: " + encodeURIComponent(getFornLabel()) + "%0A" +
-    "Loja: " + LOJAS[currentLoja] + "%0A" +
-    "Data: " + document.getElementById("dataMapa").value + "%0A" +
-    "Preenchido por: " + encodeURIComponent(por) + "%0A" +
-    "Artigos com encomenda: " + linhasComEnc + "%0A" +
-    "Soma Encomenda Final: " + totalFinal + "%0A" +
-    "Observações: " + encodeURIComponent(obs) + "%0A%0A" +
-    "Anexe o ficheiro Excel que acabou de ser descarregado:%0A" +
-    nomeFicheiro + "%0A%0AObrigado.";
-  setTimeout(() => {
-    window.location.href = "mailto:nuno.justino@coopsintra.pt?subject=" + encodeURIComponent(assunto) + "&body=" + corpo;
-  }, 500);
+
+/** Gera o Excel em memória (base64) para envio pelo servidor */
+function excelBase64() {
+  const aoa = buildSheetAOA();
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [
+    {wch:12},{wch:45},{wch:12},{wch:10},{wch:12},{wch:10},{wch:10},{wch:14}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Mapa");
+  const fileName = excelFileName();
+  const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+  return { fileName, base64 };
+}
+
+/** Envia o mapa por email (Edge Function Supabase → SMTP da loja → Nuno) */
+async function enviarEmail() {
+  const btn = document.querySelector(".btn-email");
+  if (btn) { btn.disabled = true; btn.textContent = "A enviar…"; }
+  try {
+    if (typeof sb === "undefined" || !sb) initSupabase();
+    const { fileName, base64 } = excelBase64();
+    try { downloadExcel(); } catch (_) {}
+    let totalFinal = 0, linhasComEnc = 0;
+    document.querySelectorAll("#tbody tr").forEach(tr => {
+      const f = (tr.querySelector("[data-final]") || {}).textContent;
+      if (f && f !== "—" && Number(f) > 0) { totalFinal += Number(f); linhasComEnc++; }
+    });
+    const por = document.getElementById("preenchidoPor").value || "(não indicado)";
+    const obs = document.getElementById("obsGeral").value || "(sem observações)";
+    const { data, error } = await sb.functions.invoke("enviar-mapa", {
+      body: {
+        lojaCode: currentLoja,
+        lojaNome: LOJAS[currentLoja],
+        fornecedor: getFornLabel(),
+        dataMapa: document.getElementById("dataMapa").value,
+        preenchidoPor: por,
+        observacoes: obs,
+        artigosComEncomenda: linhasComEnc,
+        somaEncomendaFinal: totalFinal,
+        fileName: fileName,
+        fileBase64: base64
+      }
+    });
+    if (error) throw new Error(error.message || String(error));
+    if (data && data.error) throw new Error(data.error);
+    alert(
+      "Email enviado com sucesso para compras.\n\n" +
+      "Loja: " + (LOJAS[currentLoja] || currentLoja) + "\n" +
+      "Ficheiro: " + fileName
+    );
+  } catch (e) {
+    console.error(e);
+    alert(
+      "Erro ao enviar email:\n\n" + (e.message || e) +
+      "\n\nConfirme se a function «enviar-mapa» está publicada e as senhas SMTP no Supabase."
+    );
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Enviar por email"; }
+  }
 }
 
 fillFornSelects();
