@@ -1,5 +1,5 @@
 // Service Worker simples para o Mapa Stock Coopsintra
-const CACHE_NAME = "mapa-stock-v1";
+const CACHE_NAME = "mapa-stock-v2";
 const ASSETS = [
   "./",
   "./index.html",
