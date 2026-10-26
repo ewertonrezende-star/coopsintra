@@ -120,6 +120,14 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
   thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
+
+.pwd-wrap { margin-top: 12px; display: none; }
+.pwd-wrap label { font-weight: 600; font-size: 12px; display: block; margin-bottom: 4px; color: var(--muted); }
+.pwd-wrap input[type="password"] {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px;
+}
+.pwd-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
 /* Branding Coopsintra */
 .login-logo {
   display: block;
@@ -152,7 +160,7 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
         <div style="font-size:11px;color:var(--muted);margin-top:4px">A central cria o código e envia o link às lojas.</div>
       </div>
       <div class="role-btns">
-        <button class="role-btn" onclick="entrarCentral()">
+        <button class="role-btn" onclick="mostrarCentralPwd()">
           <strong>Central / Compras</strong>
           <span>Carregar vendas e publicar para as lojas (online)</span>
         </button>
@@ -161,9 +169,18 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
           <span>Escolher loja · selecionar fornecedor no mapa</span>
         </button>
       </div>
+
+      <!-- Senha Central -->
+      <div class="pwd-wrap" id="centralPwdWrap">
+        <label>Senha da Central / Compras</label>
+        <input type="password" id="centralPwd" placeholder="Introduza a senha" autocomplete="current-password">
+        <p class="pwd-hint">Acesso reservado à equipa de compras.</p>
+        <button class="btn btn-primary" style="margin-top:10px;width:100%" onclick="entrarCentral()">Entrar na Central</button>
+      </div>
+
       <div class="loja-select-wrap" id="lojaSelectWrap">
         <label>Loja</label>
-        <select id="selectLojaHome">
+        <select id="selectLojaHome" onchange="atualizarLabelSenhaLoja()">
           <option value="AL">Albarraque</option>
           <option value="AM">Arneiro Marinheiro</option>
           <option value="CO">Colares</option>
@@ -171,6 +188,10 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
           <option value="LC" selected>Sintra</option>
           <option value="SA">Sabugo</option>
         </select>
+        <div style="margin-top:10px">
+          <label id="labelSenhaLoja">Senha da loja (Sintra)</label>
+          <input type="password" id="lojaPwd" placeholder="Introduza a senha da loja" autocomplete="current-password" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:14px;margin-top:4px">
+        </div>
         <p style="font-size:12px;color:var(--muted);margin-top:8px">O fornecedor escolhe-se dentro do mapa.</p>
         <button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="entrarLoja()">Abrir mapa</button>
       </div>
@@ -281,6 +302,18 @@ const SUPABASE_ANON_KEY = "sb_publishable_pBZHhN4Faqfr70_2FXqezg_UsqWu9JX";
 const LOJAS = {
   AL: "Albarraque", AM: "Arneiro Marinheiro", CO: "Colares",
   MM: "Mem Martins", LC: "Sintra", SA: "Sabugo"
+};
+
+// ===== SENHAS (altere aqui) =====
+// Nota: ficam no código da página — adequado para uso interno, não para dados públicos.
+const SENHAS = {
+  central: "compras2026",
+  AL: "albarraque2026",
+  AM: "arneiro2026",
+  CO: "colares2026",
+  MM: "memmartins2026",
+  LC: "sintra2026",
+  SA: "sabugo2026"
 };
 
 const FORNECEDORES = {
@@ -735,9 +768,29 @@ function showScreen(id) {
 function voltarHome() {
   showScreen("screenHome");
   document.getElementById("lojaSelectWrap").style.display = "none";
+  document.getElementById("centralPwdWrap").style.display = "none";
+  const cp = document.getElementById("centralPwd");
+  const lp = document.getElementById("lojaPwd");
+  if (cp) cp.value = "";
+  if (lp) lp.value = "";
+}
+function mostrarCentralPwd() {
+  document.getElementById("lojaSelectWrap").style.display = "none";
+  document.getElementById("centralPwdWrap").style.display = "block";
+  document.getElementById("homeMsg").innerHTML = "";
+  setTimeout(() => document.getElementById("centralPwd").focus(), 50);
 }
 function mostrarLojaSelect() {
+  document.getElementById("centralPwdWrap").style.display = "none";
   document.getElementById("lojaSelectWrap").style.display = "block";
+  document.getElementById("homeMsg").innerHTML = "";
+  atualizarLabelSenhaLoja();
+  setTimeout(() => document.getElementById("lojaPwd").focus(), 50);
+}
+function atualizarLabelSenhaLoja() {
+  const cod = document.getElementById("selectLojaHome").value;
+  const nome = LOJAS[cod] || cod;
+  document.getElementById("labelSenhaLoja").textContent = "Senha da loja (" + nome + ")";
 }
 
 async function ensureBlob() {
@@ -758,6 +811,13 @@ async function ensureBlob() {
 
 async function entrarCentral() {
   const msg = document.getElementById("homeMsg");
+  const pwd = (document.getElementById("centralPwd") || {}).value || "";
+  if (pwd !== SENHAS.central) {
+    msg.innerHTML = '<span class="status err">Senha da Central incorreta.</span>';
+    const el = document.getElementById("centralPwd");
+    if (el) { el.value = ""; el.focus(); }
+    return;
+  }
   msg.innerHTML = '<span class="status info">A ligar ao Supabase…</span>';
   try {
     await ensureBlob();
@@ -774,6 +834,14 @@ async function entrarCentral() {
 
 async function entrarLoja() {
   const msg = document.getElementById("homeMsg");
+  const lojaCod = document.getElementById("selectLojaHome").value;
+  const pwd = (document.getElementById("lojaPwd") || {}).value || "";
+  if (pwd !== SENHAS[lojaCod]) {
+    msg.innerHTML = '<span class="status err">Senha da loja incorreta.</span>';
+    const el = document.getElementById("lojaPwd");
+    if (el) { el.value = ""; el.focus(); }
+    return;
+  }
   msg.innerHTML = '<span class="status info">A carregar…</span>';
   try {
     initSupabase();
@@ -785,7 +853,7 @@ async function entrarLoja() {
     blobId = input;
     cloudData = await cloudGet(blobId);
     setUrlBlobId(blobId);
-    currentLoja = document.getElementById("selectLojaHome").value;
+    currentLoja = lojaCod;
     currentForn = "ribeiros";
     document.getElementById("selectFornLoja").value = currentForn;
     aplicarFornecedorUI();
@@ -1231,6 +1299,15 @@ fillFornSelects();
         .catch(function(err) { console.log("SW erro", err); });
     });
   }
+
+// Enter nas senhas
+document.addEventListener("DOMContentLoaded", () => {
+  const cp = document.getElementById("centralPwd");
+  const lp = document.getElementById("lojaPwd");
+  if (cp) cp.addEventListener("keydown", e => { if (e.key === "Enter") entrarCentral(); });
+  if (lp) lp.addEventListener("keydown", e => { if (e.key === "Enter") entrarLoja(); });
+});
+
 </script>
 
 </body>
