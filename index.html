@@ -196,6 +196,7 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
         <button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="entrarLoja()">Abrir mapa</button>
       </div>
       <div id="homeMsg" style="margin-top:12px"></div>
+      <button type="button" class="btn btn-secondary" id="btnForgetAuth" style="margin-top:10px;width:100%;display:none;font-size:12px" onclick="esquecerAuthNestePC()">Esquecer senhas neste computador</button>
     </div>
   </div>
 </div>
@@ -308,13 +309,58 @@ const LOJAS = {
 // Nota: ficam no código da página — adequado para uso interno, não para dados públicos.
 const SENHAS = {
   central: "compras2026",
-  AL: "albarraque2026",
-  AM: "arneiro2026",
-  CO: "colares2026",
-  MM: "memmartins2026",
-  LC: "sintra2026",
-  SA: "sabugo2026"
+  AL: "albarraque",
+  AM: "arneiro",
+  CO: "colares",
+  MM: "memmartins",
+  LC: "sintra",
+  SA: "sabugo"
 };
+
+// Lembra autenticação neste computador (localStorage)
+const AUTH_KEY = "coopsintra_auth_v1";
+function loadAuth() {
+  try { return JSON.parse(localStorage.getItem(AUTH_KEY) || "{}"); } catch { return {}; }
+}
+function saveAuth(obj) {
+  localStorage.setItem(AUTH_KEY, JSON.stringify(obj));
+}
+function isAuthed(role) {
+  const a = loadAuth();
+  return !!a[role];
+}
+function setAuthed(role) {
+  const a = loadAuth();
+  a[role] = true;
+  a["ts_" + role] = Date.now();
+  saveAuth(a);
+}
+function clearAuthed(role) {
+  const a = loadAuth();
+  delete a[role];
+  delete a["ts_" + role];
+  saveAuth(a);
+}
+
+function esquecerAuthNestePC() {
+  if (!confirm("Remover as senhas guardadas neste computador?")) return;
+  localStorage.removeItem(AUTH_KEY);
+  document.getElementById("btnForgetAuth").style.display = "none";
+  document.getElementById("centralPwdWrap").style.display = "none";
+  document.getElementById("lojaSelectWrap").style.display = "none";
+  document.getElementById("homeMsg").innerHTML = '<span class="status ok">Senhas esquecidas neste PC.</span>';
+  const cp = document.getElementById("centralPwd");
+  const lp = document.getElementById("lojaPwd");
+  if (cp) { cp.value = ""; cp.placeholder = "Introduza a senha"; }
+  if (lp) { lp.value = ""; lp.placeholder = "Introduza a senha da loja"; }
+}
+function atualizarBotaoEsquecer() {
+  const a = loadAuth();
+  const has = Object.keys(a).some(k => !k.startsWith("ts_"));
+  const btn = document.getElementById("btnForgetAuth");
+  if (btn) btn.style.display = has ? "block" : "none";
+}
+
 
 const FORNECEDORES = {
   "ribeiros": {
@@ -769,6 +815,7 @@ function voltarHome() {
   showScreen("screenHome");
   document.getElementById("lojaSelectWrap").style.display = "none";
   document.getElementById("centralPwdWrap").style.display = "none";
+  atualizarBotaoEsquecer();
   const cp = document.getElementById("centralPwd");
   const lp = document.getElementById("lojaPwd");
   if (cp) cp.value = "";
@@ -776,8 +823,14 @@ function voltarHome() {
 }
 function mostrarCentralPwd() {
   document.getElementById("lojaSelectWrap").style.display = "none";
-  document.getElementById("centralPwdWrap").style.display = "block";
   document.getElementById("homeMsg").innerHTML = "";
+  if (isAuthed("central")) {
+    document.getElementById("centralPwdWrap").style.display = "none";
+    entrarCentral();
+    return;
+  }
+  document.getElementById("centralPwdWrap").style.display = "block";
+  atualizarBotaoEsquecer();
   setTimeout(() => document.getElementById("centralPwd").focus(), 50);
 }
 function mostrarLojaSelect() {
@@ -785,12 +838,28 @@ function mostrarLojaSelect() {
   document.getElementById("lojaSelectWrap").style.display = "block";
   document.getElementById("homeMsg").innerHTML = "";
   atualizarLabelSenhaLoja();
-  setTimeout(() => document.getElementById("lojaPwd").focus(), 50);
+  const cod = document.getElementById("selectLojaHome").value;
+  if (isAuthed(cod)) {
+    // já autenticado nesta loja neste PC — não precisa de senha
+    document.getElementById("lojaPwd").value = "";
+    document.getElementById("lojaPwd").placeholder = "Já autenticado neste computador";
+  } else {
+    document.getElementById("lojaPwd").placeholder = "Introduza a senha da loja";
+    setTimeout(() => document.getElementById("lojaPwd").focus(), 50);
+  }
 }
 function atualizarLabelSenhaLoja() {
   const cod = document.getElementById("selectLojaHome").value;
   const nome = LOJAS[cod] || cod;
-  document.getElementById("labelSenhaLoja").textContent = "Senha da loja (" + nome + ")";
+  const authed = isAuthed(cod);
+  document.getElementById("labelSenhaLoja").textContent = authed
+    ? "Senha da loja (" + nome + ") — já guardada neste PC"
+    : "Senha da loja (" + nome + ")";
+  const lp = document.getElementById("lojaPwd");
+  if (lp) {
+    lp.placeholder = authed ? "Já autenticado neste computador" : "Introduza a senha da loja";
+    if (authed) lp.value = "";
+  }
 }
 
 async function ensureBlob() {
@@ -812,11 +881,14 @@ async function ensureBlob() {
 async function entrarCentral() {
   const msg = document.getElementById("homeMsg");
   const pwd = (document.getElementById("centralPwd") || {}).value || "";
-  if (pwd !== SENHAS.central) {
-    msg.innerHTML = '<span class="status err">Senha da Central incorreta.</span>';
-    const el = document.getElementById("centralPwd");
-    if (el) { el.value = ""; el.focus(); }
-    return;
+  if (!isAuthed("central")) {
+    if (pwd !== SENHAS.central) {
+      msg.innerHTML = '<span class="status err">Senha da Central incorreta.</span>';
+      const el = document.getElementById("centralPwd");
+      if (el) { el.value = ""; el.focus(); }
+      return;
+    }
+    setAuthed("central");
   }
   msg.innerHTML = '<span class="status info">A ligar ao Supabase…</span>';
   try {
@@ -836,11 +908,14 @@ async function entrarLoja() {
   const msg = document.getElementById("homeMsg");
   const lojaCod = document.getElementById("selectLojaHome").value;
   const pwd = (document.getElementById("lojaPwd") || {}).value || "";
-  if (pwd !== SENHAS[lojaCod]) {
-    msg.innerHTML = '<span class="status err">Senha da loja incorreta.</span>';
-    const el = document.getElementById("lojaPwd");
-    if (el) { el.value = ""; el.focus(); }
-    return;
+  if (!isAuthed(lojaCod)) {
+    if (pwd !== SENHAS[lojaCod]) {
+      msg.innerHTML = '<span class="status err">Senha da loja incorreta.</span>';
+      const el = document.getElementById("lojaPwd");
+      if (el) { el.value = ""; el.focus(); }
+      return;
+    }
+    setAuthed(lojaCod);
   }
   msg.innerHTML = '<span class="status info">A carregar…</span>';
   try {
@@ -1306,6 +1381,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const lp = document.getElementById("lojaPwd");
   if (cp) cp.addEventListener("keydown", e => { if (e.key === "Enter") entrarCentral(); });
   if (lp) lp.addEventListener("keydown", e => { if (e.key === "Enter") entrarLoja(); });
+  atualizarBotaoEsquecer();
 });
 
 </script>
