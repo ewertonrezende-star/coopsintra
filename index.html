@@ -145,39 +145,122 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
 }
 
 
-/* Botão instalar app (discreto) */
+
+/* Botão instalar na tela inicial */
+.btn-install-home {
+  margin-top: 16px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--primary);
+  border-radius: 10px;
+  background: #f5faf5;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  transition: background .15s, border-color .15s;
+}
+.btn-install-home:hover {
+  background: #e8f5e9;
+  border-color: var(--primary-dark);
+}
+.btn-install-home svg {
+  flex-shrink: 0;
+}
+.install-home-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  display: none;
+  line-height: 1.4;
+}
+.install-home-hint.visible {
+  display: block;
+}
+
+/* Botão instalar app (flutuante) */
 .install-btn {
   position: fixed;
   bottom: 18px;
   right: 18px;
   z-index: 9999;
-  width: 44px;
+  min-width: 44px;
   height: 44px;
-  border-radius: 50%;
+  padding: 0 14px;
+  border-radius: 22px;
   border: none;
   background: #1a5f2a;
   color: white;
-  box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  box-shadow: 0 4px 14px rgba(0,0,0,.28);
   cursor: pointer;
-  display: flex;
+  display: none; /* controlado por JS */
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
   transition: transform .2s, opacity .2s, background .2s;
-  opacity: 0.85;
+  opacity: 0.92;
+}
+.install-btn.visible {
+  display: flex !important;
 }
 .install-btn:hover {
-  transform: scale(1.08);
+  transform: scale(1.05);
   opacity: 1;
   background: #144a20;
 }
 .install-btn:active {
   transform: scale(0.96);
 }
-.install-btn[hidden] {
-  display: none !important;
+.install-btn svg {
+  flex-shrink: 0;
 }
 @media (display-mode: standalone) {
   .install-btn { display: none !important; }
+}
+
+/* Dica iOS */
+.install-ios-tip {
+  position: fixed;
+  bottom: 70px;
+  right: 18px;
+  left: 18px;
+  max-width: 320px;
+  margin-left: auto;
+  z-index: 10000;
+  background: #fff;
+  border: 1px solid #c8d6c9;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.18);
+  font-size: 13px;
+  line-height: 1.45;
+  color: #1a1a1a;
+  display: none;
+}
+.install-ios-tip.visible {
+  display: block;
+}
+.install-ios-tip strong {
+  color: #1a5f2a;
+}
+.install-ios-tip .close-tip {
+  float: right;
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #666;
+  line-height: 1;
+  padding: 0 0 0 8px;
 }
 
 </style>
@@ -205,6 +288,17 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
           <span>Escolher loja · selecionar fornecedor no mapa</span>
         </button>
       </div>
+
+      <!-- Instalar app (sempre visível na tela inicial) -->
+      <button type="button" id="btnInstallHome" class="btn-install-home" title="Instalar aplicação">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Instalar app no telemóvel / PC
+      </button>
+      <div id="installHomeHint" class="install-home-hint"></div>
 
       <!-- Senha Central -->
       <div class="pwd-wrap" id="centralPwdWrap">
@@ -345,11 +439,11 @@ const LOJAS = {
 // Nota: ficam no código da página — adequado para uso interno, não para dados públicos.
 const SENHAS = {
   central: "compras2026",
-  AL: "albarraque1945",
+  AL: "albarraque2026",
   AM: "arneiro2026",
   CO: "colares1945",
   MM: "memmartins2026",
-  LC: "sintra1945",
+  LC: "sintra2026",
   SA: "sabugo2026"
 };
 
@@ -1403,14 +1497,19 @@ fillFornSelects();
 </script>
 
 
-<!-- Botão discreto de instalação -->
-<button id="btnInstall" class="install-btn" title="Instalar app" aria-label="Instalar aplicação" hidden>
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<!-- Botão instalar app -->
+<button id="btnInstall" class="install-btn" title="Instalar app" aria-label="Instalar aplicação">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
     <polyline points="7 10 12 15 17 10"/>
     <line x1="12" y1="15" x2="12" y2="3"/>
   </svg>
+  <span>Instalar</span>
 </button>
+<div id="installIosTip" class="install-ios-tip">
+  <button type="button" class="close-tip" onclick="document.getElementById('installIosTip').classList.remove('visible')" aria-label="Fechar">×</button>
+  No iPhone/iPad: toque em <strong>Partilhar</strong> (□↑) e depois em <strong>Adicionar ao Ecrã Principal</strong>.
+</div>
 
 <script>
   if ("serviceWorker" in navigator) {
@@ -1433,35 +1532,117 @@ document.addEventListener("DOMContentLoaded", () => {
   // ===== Instalação PWA =====
   let deferredPrompt = null;
 
+  function isStandalone() {
+    return window.matchMedia("(display-mode: standalone)").matches
+      || window.navigator.standalone === true;
+  }
+
+  function isIos() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+
+  function showFloatingBtn() {
+    const btn = document.getElementById("btnInstall");
+    if (btn) btn.classList.add("visible");
+  }
+
+  function hideFloatingBtn() {
+    const btn = document.getElementById("btnInstall");
+    if (btn) btn.classList.remove("visible");
+    const tip = document.getElementById("installIosTip");
+    if (tip) tip.classList.remove("visible");
+  }
+
+  function setHomeHint(msg, isHtml) {
+    const hint = document.getElementById("installHomeHint");
+    if (!hint) return;
+    if (!msg) {
+      hint.classList.remove("visible");
+      hint.textContent = "";
+      return;
+    }
+    if (isHtml) hint.innerHTML = msg;
+    else hint.textContent = msg;
+    hint.classList.add("visible");
+  }
+
+  async function doInstall() {
+    // Já instalada: ainda assim mostra informação (pedido do utilizador)
+    if (isStandalone()) {
+      setHomeHint("A app já está instalada neste dispositivo. Pode continuar a usá-la a partir do ícone no ecrã inicial.");
+      return;
+    }
+
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log("Instalação:", outcome);
+      deferredPrompt = null;
+      if (outcome === "accepted") {
+        setHomeHint("App instalada com sucesso.");
+        hideFloatingBtn();
+      } else {
+        setHomeHint("Instalação cancelada. Pode tentar de novo quando quiser.");
+      }
+      return;
+    }
+
+    if (isIos()) {
+      setHomeHint(
+        'No iPhone/iPad: toque em <strong>Partilhar</strong> (□↑) e depois em <strong>Adicionar ao Ecrã Principal</strong>.',
+        true
+      );
+      const tip = document.getElementById("installIosTip");
+      if (tip) tip.classList.add("visible");
+      return;
+    }
+
+    setHomeHint("Para instalar: no menu do browser escolha «Instalar aplicação» ou «Adicionar ao ecrã inicial».");
+  }
+
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    const btn = document.getElementById("btnInstall");
-    if (btn) btn.hidden = false;
+    showFloatingBtn();
   });
 
   document.addEventListener("DOMContentLoaded", () => {
-    const btnInstall = document.getElementById("btnInstall");
-    if (btnInstall) {
-      btnInstall.addEventListener("click", async () => {
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log("Instalação:", outcome);
-        deferredPrompt = null;
-        btnInstall.hidden = true;
-      });
+    const btnHome = document.getElementById("btnInstallHome");
+    const btnFloat = document.getElementById("btnInstall");
+
+    // Botão da tela inicial: SEMPRE visível e clicável (mesmo se já instalado)
+    if (btnHome) {
+      btnHome.addEventListener("click", doInstall);
+      if (isStandalone()) {
+        // Mantém o botão, só muda o texto ligeiramente
+        btnHome.innerHTML = btnHome.innerHTML.replace(
+          "Instalar app no telemóvel / PC",
+          "App instalada · ver info"
+        );
+      }
     }
-    // Esconde se já estiver instalado
-    if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone) {
-      if (btnInstall) btnInstall.hidden = true;
+
+    if (btnFloat) {
+      // Flutuante: só se ainda não estiver instalada
+      if (!isStandalone()) showFloatingBtn();
+      else hideFloatingBtn();
+
+      btnFloat.addEventListener("click", doInstall);
     }
   });
 
   window.addEventListener("appinstalled", () => {
     deferredPrompt = null;
-    const btn = document.getElementById("btnInstall");
-    if (btn) btn.hidden = true;
+    hideFloatingBtn();
+    setHomeHint("App instalada com sucesso. Pode abri-la a partir do ecrã inicial.");
+    const btnHome = document.getElementById("btnInstallHome");
+    if (btnHome) {
+      btnHome.innerHTML = btnHome.innerHTML.replace(
+        "Instalar app no telemóvel / PC",
+        "App instalada · ver info"
+      ).replace("App instalada · ver info", "App instalada · ver info");
+    }
   });
 
 </script>
