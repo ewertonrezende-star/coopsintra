@@ -52,6 +52,7 @@ select, input[type="text"], input[type="date"] {
 .btn-secondary { background: #e8e8e8; color: #333; }
 .btn-export { background: #1565c0; color: #fff; }
 .btn-email { background: #6a1b9a; color: #fff; }
+.btn-limpar { background: #fff3cd; color: #856404; border: 1px solid #e0c060; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .topbar {
   background: var(--primary); color: #fff; padding: 12px 18px;
@@ -92,9 +93,29 @@ tbody tr.has-diff { background: #fff8e1 !important; }
 input.stock-real, input.alt-enc {
   width: 78px; padding: 4px 6px; border: 1px solid #bbb; border-radius: 3px;
   font-size: 13px; text-align: right;
+  transition: background .12s, border-color .12s, box-shadow .12s;
 }
 input.stock-real { background: var(--accent); border-color: #e0c060; font-weight: 600; }
 input.alt-enc:disabled { background: #f0f0f0; color: #999; }
+/* Linha inteira em azul enquanto preenche */
+tbody tr.row-editing {
+  background: #bbdefb !important;
+  box-shadow: inset 3px 0 0 #1565c0, inset -3px 0 0 #1565c0;
+}
+tbody tr.row-editing td {
+  background: transparent !important;
+  border-bottom-color: #64b5f6;
+}
+tbody tr.row-editing.has-diff {
+  background: #90caf9 !important;
+}
+input.stock-real:focus, input.alt-enc:focus {
+  outline: none;
+  background: #fff !important;
+  border-color: #0d47a1 !important;
+  box-shadow: 0 0 0 2px rgba(13, 71, 161, 0.35);
+  font-weight: 700;
+}
 .prev { font-weight: 700; color: var(--primary); }
 .prev.zero { color: #999; font-weight: 400; }
 .footer-bar {
@@ -371,6 +392,7 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
       <span id="lojaDataStatus" class="status warn">Sem dados</span>
       <button class="btn btn-secondary" onclick="window.print()">Imprimir</button>
       <button class="btn btn-export" onclick="exportCSV()">Exportar Excel</button>
+      <button class="btn btn-secondary" id="btnLimpar" onclick="limparPreenchimento()" title="Limpa stock real, alterações e observações. Não remove os ficheiros de vendas.">Limpar preenchimento</button>
       <button class="btn btn-secondary" onclick="voltarHome()">Sair</button>
     </div>
   </div>
@@ -415,6 +437,7 @@ input.alt-enc:disabled { background: #f0f0f0; color: #999; }
         <input type="date" id="dataPreenchimento" style="width:140px">
       </div>
       <button class="btn btn-primary" id="btnGuardar" onclick="guardarRespostaOnline()">Guardar online</button>
+      <button class="btn btn-secondary" onclick="limparPreenchimento()" title="Limpa os campos preenchidos (stock real, alteração, observações). Não remove ficheiros de vendas.">Limpar preenchimento</button>
       <button class="btn btn-export" onclick="exportCSV()">Exportar Excel</button>
       <button class="btn btn-email" onclick="enviarEmail()">Enviar por email</button>
       <div class="count-info">
@@ -498,13 +521,10 @@ const FORNECEDORES = {
     lead: 15,
     items: [
       {c:"10100029",d:"Alimpadura de Trigo 5kg (ribeiros)"},
-      {c:"10100031",d:"Alimpadura de Trigo 25kg (ribeiros)"},
-      {c:"10100041",d:"Soja 44 sacos 25kg (ribeiros)"},
+      {c:"10100031",d:"Alimpadura de Trigo 25kg (ribeiros)"}
       {c:"10200006",d:"Alpista do Canada 1kg (Ribeiros)"},
-      {c:"10200007",d:"Alpista do Canada 20kg (Ribeiros)"},
       {c:"10300008",d:"Aveia 4kg (Ribeiros)"},
       {c:"10300103",d:"Aveia 20kg (Ribeiros)"},
-      {c:"10300104",d:"Aveia 15kg (Ribeiros)"},
       {c:"10400050",d:"Cevada Ração 5kg (ribeiros)"},
       {c:"10400052",d:"Cevada Ração 25kg (ribeiros)"},
       {c:"10500034",d:"Faveca 25kg (ribeiros)"},
@@ -514,7 +534,6 @@ const FORNECEDORES = {
       {c:"10600105",d:"Milho Partido 25kg (ribeiros)"},
       {c:"10600106",d:"Milho Grado 25kg (ribeiros)"},
       {c:"10600107",d:"Milho Medio 25kg (ribeiros)"},
-      {c:"10900007",d:"Alfarroba triturado grado 15kg (ribeiros)"},
       {c:"20810013",d:"Luzerna granulada 25kg (ribeiros)"},
       {c:"81103822",d:"Areia p/gatos perfumada \"Saint Bernard\" 5kg"},
       {c:"81109001",d:"Mistura p/canarios 1kg (ribeiros)"},
@@ -1247,13 +1266,37 @@ function bindInputs() {
   document.querySelectorAll(".stock-real").forEach(inp => {
     inp.addEventListener("input", onStockRealChange);
     inp.addEventListener("change", onStockRealChange);
+    inp.addEventListener("focus", onCellFocus);
+    inp.addEventListener("blur", onCellBlur);
   });
   document.querySelectorAll(".alt-enc").forEach(inp => {
     inp.addEventListener("input", (e) => {
       updateEncomendaFinal(e.target.closest("tr"));
       updateCounts();
     });
+    inp.addEventListener("focus", onCellFocus);
+    inp.addEventListener("blur", onCellBlur);
   });
+}
+function onCellFocus(e) {
+  const tr = e.target.closest("tr");
+  // remove destaque de qualquer outra linha
+  document.querySelectorAll("tbody tr.row-editing").forEach(function(el) {
+    if (el !== tr) el.classList.remove("row-editing");
+  });
+  if (tr) tr.classList.add("row-editing");
+}
+function onCellBlur(e) {
+  // só remove se o foco não passou para outro input da mesma linha
+  const tr = e.target.closest("tr");
+  setTimeout(function() {
+    const ativo = document.activeElement;
+    if (!tr) return;
+    if (ativo && tr.contains(ativo) && (ativo.classList.contains("stock-real") || ativo.classList.contains("alt-enc"))) {
+      return; // ainda está a editar na mesma linha
+    }
+    tr.classList.remove("row-editing");
+  }, 0);
 }
 function onStockRealChange(e) {
   const tr = e.target.closest("tr"); if (!tr) return;
@@ -1355,6 +1398,39 @@ function applyResposta(resp) {
   });
   updateCounts();
 }
+function limparPreenchimento() {
+  const rows = document.querySelectorAll("#tbody tr");
+  if (!rows.length) {
+    alert("Não há linhas para limpar.");
+    return;
+  }
+  if (!confirm("Limpar o preenchimento deste fornecedor?\n\nApaga: Stock Real, Alteração, Observações e «Preenchido por».\n\nNão remove os ficheiros de vendas da Central.\n\nPara gravar o mapa vazio online, clique em Guardar online a seguir.")) {
+    return;
+  }
+  rows.forEach(function(tr) {
+    const inpReal = tr.querySelector(".stock-real");
+    const inpAlt = tr.querySelector(".alt-enc");
+    if (inpReal) inpReal.value = "";
+    if (inpAlt) {
+      inpAlt.value = "";
+      inpAlt.disabled = true;
+      inpAlt.placeholder = "—";
+    }
+    tr.classList.remove("has-diff");
+    if (typeof updatePrevisaoRow === "function") updatePrevisaoRow(tr);
+  });
+  const obs = document.getElementById("obsGeral");
+  if (obs) obs.value = "";
+  const por = document.getElementById("preenchidoPor");
+  if (por) por.value = "";
+  if (typeof updateCounts === "function") updateCounts();
+  const st = document.getElementById("lojaDataStatus");
+  if (st) {
+    st.textContent = "Preenchimento limpo (não guardado)";
+    st.className = "status warn";
+  }
+}
+
 async function guardarRespostaOnline() {
   const btn = document.getElementById("btnGuardar");
   btn.disabled = true; btn.textContent = "A guardar…";
