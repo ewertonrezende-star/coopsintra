@@ -356,7 +356,7 @@ input.stock-real:focus, input.alt-enc:focus {
   <div class="topbar">
     <div>
       <h2>Central · Publicar dados</h2>
-      <div class="meta">Código: <span id="centralBlobLabel">—</span> · O ficheiro de vendas alimenta todos os fornecedores</div>
+      <div class="meta">Código: <span id="centralBlobLabel">—</span> · O ficheiro de stock + vendas alimenta todos os fornecedores</div>
     </div>
     <div class="topbar-actions">
       <button class="btn btn-secondary" onclick="copiarLink()">Copiar link para lojas</button>
@@ -369,9 +369,9 @@ input.stock-real:focus, input.alt-enc:focus {
       <div class="code-box" id="centralCodeBox">—</div>
     </div>
     <div class="card">
-      <h3>Carregar ficheiro de vendas por loja</h3>
+      <h3>Carregar stock + vendas por loja</h3>
       <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
-        Um ficheiro por loja (Artigo, Stock, Vendas). Na loja escolhem o fornecedor e veem só os itens desse fornecedor.
+        Um ficheiro por loja com <strong>stock atualizado</strong> e vendas (colunas: Artigo, Stock, Vendas). O <strong>Stock Sistema</strong> no mapa é lido deste ficheiro. Na loja escolhem o fornecedor e veem só os itens desse fornecedor.
       </p>
       <div class="admin-grid" id="adminGrid"></div>
     </div>
@@ -597,7 +597,7 @@ const FORNECEDORES = {
   },
   "avenal": {
     label: "Avenal Petfood, S.A.",
-    lead: 30,
+    lead: 60,
     items: [
       {c:"81100017",d:"Avenal Cat Carne 4kg"},
       {c:"81100089",d:"Avenal Dog Active 20kg"},
@@ -850,7 +850,7 @@ const FORNECEDORES = {
   },
   "sdpaa": {
     label: "SDPAA - Soc Distrib de Prod e Alim Animal, Lda",
-    lead: 30,
+    lead: 60,
     items: [
       {c:"20321200",d:"NANTA camperovo gra 5kg"},
       {c:"20321209",d:"NANTA camperovo far 5kg"},
@@ -1163,7 +1163,7 @@ function renderAdminGrid() {
       <span class="tag ${hasData ? "ok" : "warn"}">${hasData ? "Online · " + (pub.updatedAt || "") : "Sem dados"}</span>
       <input type="file" accept=".xlsx,.xls,.csv" data-loja="${code}">
       <div style="font-size:11px;color:var(--muted)" id="msg-${code}">
-        ${hasData ? Object.keys(pub.stockData).length + " artigos" : "Carregar ficheiro de vendas"}
+        ${hasData ? Object.keys(pub.stockData).length + " artigos" : "Carregar stock + vendas"}
       </div>`;
     grid.appendChild(div);
     div.querySelector("input[type=file]").addEventListener("change", e => onAdminFile(e, code));
@@ -1200,14 +1200,36 @@ async function onAdminFile(e, lojaCode) {
 
 function parseVendas(rows) {
   const out = {};
-  for (const row of rows) {
-    if (!row || row.length < 3) continue;
-    const code = String(row[0] || "").trim();
+  if (!rows || !rows.length) return out;
+
+  // Detectar colunas pelo cabeçalho (se existir)
+  let idxArt = 0, idxStock = 2, idxVendas = -1;
+  const header = rows[0].map(h => String(h || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+  const looksHeader = header.some(h => /artigo|codigo|code|stock|venda/.test(h));
+  if (looksHeader) {
+    header.forEach((h, i) => {
+      if (/^(artigo|codigo|c[oó]digo|code)$/.test(h) || h.includes("artigo")) idxArt = i;
+      if (h.includes("stock") && !h.includes("real")) idxStock = i;
+      if (h.includes("venda") || h.includes("saida") || h.includes("consumo")) idxVendas = i;
+    });
+    if (idxVendas < 0) idxVendas = header.length - 1;
+  } else {
+    idxVendas = rows[0].length > 5 ? 5 : rows[0].length - 1;
+  }
+
+  const start = looksHeader ? 1 : 0;
+  for (let r = start; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.length < 2) continue;
+    const code = String(row[idxArt] || "").trim();
     if (!/^\d{5,}/.test(code)) continue;
-    const stock = parseNum(row[2]);
+    const stock = parseNum(row[idxStock]);
     let vendas = null;
-    if (row.length > 5 && row[5] !== "" && row[5] !== undefined) vendas = parseNum(row[5]);
-    else vendas = parseNum(row[row.length - 1]);
+    if (idxVendas >= 0 && row[idxVendas] !== "" && row[idxVendas] !== undefined) {
+      vendas = parseNum(row[idxVendas]);
+    } else {
+      vendas = parseNum(row[row.length - 1]);
+    }
     out[code] = { stock, vendas };
   }
   return out;
