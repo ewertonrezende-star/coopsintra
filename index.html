@@ -124,7 +124,7 @@ input.stock-real:focus, input.alt-enc:focus {
 }
 .footer-bar label { font-size: 11px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 3px; }
 .count-info { margin-left: auto; font-size: 12px; color: var(--muted); }
-.admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; min-height: 120px; }
 .loja-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; background: #fafcfa; }
 .loja-card h4 { font-size: 14px; margin-bottom: 6px; color: var(--primary); }
 .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-bottom: 6px; }
@@ -369,9 +369,23 @@ input.stock-real:focus, input.alt-enc:focus {
       <div class="code-box" id="centralCodeBox">—</div>
     </div>
     <div class="card">
-      <h3>Carregar stock + vendas por loja</h3>
+      <h3>1. Stock geral (ficheiro único)</h3>
       <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
-        Um ficheiro por loja com <strong>stock atualizado</strong> e vendas (colunas: Artigo, Stock, Vendas). O <strong>Stock Sistema</strong> no mapa é lido deste ficheiro. Na loja escolhem o fornecedor e veem só os itens desse fornecedor.
+        Carregue o ficheiro com o <strong>stock atual de todos os artigos</strong>
+        (ex.: «Artigos Data entrada e Ultimo Fornecedor…»). 
+        Colunas: <strong>Artigo</strong> (A), <strong>Armazém/Loja</strong> (C), <strong>Stock Atual</strong> (D). O Stock Sistema de cada loja usa só as linhas do respetivo armazém (AL, AM, CO, MM, LC, SA).
+      </p>
+      <label style="display:block;margin:0 0 6px;font-size:12px;font-weight:600;color:var(--primary)">
+        Ficheiro de stock geral (.xlsx / .csv) — se travar, grave o Excel como CSV e carregue o CSV
+      </label>
+      <input type="file" id="fileStockGeral" accept=".xlsx,.xls,.csv"
+        style="display:block;width:100%;max-width:480px;padding:10px;border:2px dashed var(--border);border-radius:8px;background:#fafcfa;cursor:pointer;font-size:13px">
+      <div id="msgStockGeral" style="margin-top:8px;font-size:12px;color:var(--muted)">Ainda sem stock geral carregado.</div>
+    </div>
+    <div class="card">
+      <h3>2. Vendas por loja (opcional / complementar)</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
+        Ficheiros por loja com <strong>Vendas</strong> (e stock da loja, se quiser). Se já carregou o <strong>stock geral</strong> acima, o Stock Sistema vem desse ficheiro; as vendas continuam a vir do ficheiro da loja.
       </p>
       <div class="admin-grid" id="adminGrid"></div>
     </div>
@@ -1058,6 +1072,7 @@ async function entrarCentral() {
     showScreen("screenCentral");
     renderAdminGrid();
     updatePubStatus();
+    // stock geral msg is refreshed inside updatePubStatus
   } catch (e) {
     msg.innerHTML = '<span class="status err">' + e.message + '</span>';
   }
@@ -1101,8 +1116,10 @@ async function entrarLoja() {
     const pub = (cloudData.lojas || {})[currentLoja];
     if (pub && pub.stockData) {
       stockData = pub.stockData;
+      const nSg = (cloudData.stockGeral && cloudData.stockGeral[currentLoja])
+          ? Object.keys(cloudData.stockGeral[currentLoja]).length : 0;
       document.getElementById("lojaDataStatus").textContent =
-        "Online · " + (pub.updatedAt || "—") + " · " + Object.keys(stockData).length + " linhas vendas";
+        "Online · " + (pub.updatedAt || "—") + " · " + Object.keys(stockData).length + " vendas · stock geral " + nSg + " arts";
       document.getElementById("lojaDataStatus").className = "status ok";
       if (pub.dataMapa) document.getElementById("dataMapa").value = pub.dataMapa;
     } else {
@@ -1151,19 +1168,25 @@ function copiarLink() {
 
 function renderAdminGrid() {
   const grid = document.getElementById("adminGrid");
+  if (!grid) return;
   grid.innerHTML = "";
   const lojas = cloudData.lojas || {};
   Object.keys(LOJAS).forEach(code => {
     const pub = lojas[code];
     const hasData = pub && pub.stockData && Object.keys(pub.stockData).length > 0;
+    const nArt = hasData ? Object.keys(pub.stockData).length : 0;
     const div = document.createElement("div");
     div.className = "loja-card";
     div.innerHTML = `
-      <h4>${LOJAS[code]}</h4>
-      <span class="tag ${hasData ? "ok" : "warn"}">${hasData ? "Online · " + (pub.updatedAt || "") : "Sem dados"}</span>
-      <input type="file" accept=".xlsx,.xls,.csv" data-loja="${code}">
-      <div style="font-size:11px;color:var(--muted)" id="msg-${code}">
-        ${hasData ? Object.keys(pub.stockData).length + " artigos" : "Carregar stock + vendas"}
+      <h4>${LOJAS[code]} <span style="font-weight:400;color:#666;font-size:12px">(${code})</span></h4>
+      <span class="tag ${hasData ? "ok" : "warn"}">${hasData ? "Online · " + (pub.updatedAt || "") + " · " + nArt + " artigos" : "Sem dados — carregue o ficheiro"}</span>
+      <label style="display:block;margin:10px 0 4px;font-size:12px;font-weight:600;color:var(--primary)">
+        Ficheiro Excel (Artigo + Stock + Vendas)
+      </label>
+      <input type="file" accept=".xlsx,.xls,.csv" data-loja="${code}"
+        style="display:block;width:100%;padding:8px;border:2px dashed var(--border);border-radius:8px;background:#fafcfa;cursor:pointer;font-size:13px">
+      <div style="font-size:11px;color:var(--muted);margin-top:6px" id="msg-${code}">
+        ${hasData ? (pub.fileName ? ("Ficheiro: " + pub.fileName) : (nArt + " artigos publicados")) : "Escolha o ficheiro desta loja para publicar stock e vendas"}
       </div>`;
     grid.appendChild(div);
     div.querySelector("input[type=file]").addEventListener("change", e => onAdminFile(e, code));
@@ -1198,46 +1221,277 @@ async function onAdminFile(e, lojaCode) {
   }
 }
 
-function parseVendas(rows) {
+
+
+function allArtigoCodes() {
+  const set = {};
+  Object.keys(FORNECEDORES).forEach(k => {
+    (FORNECEDORES[k].items || []).forEach(it => { if (it && it.c) set[it.c] = true; });
+  });
+  return set;
+}
+
+function parseStockGeral(rows, relevantCodes) {
+  // Layout fixo do export: A=Artigo(0), C=Armazém(2), D=Stock Atual(3)
   const out = {};
   if (!rows || !rows.length) return out;
 
-  // Detectar colunas pelo cabeçalho (se existir)
-  let idxArt = 0, idxStock = 2, idxVendas = -1;
-  const header = rows[0].map(h => String(h || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
-  const looksHeader = header.some(h => /artigo|codigo|code|stock|venda/.test(h));
+  const norm = (h) => String(h || "").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  let idxArt = 0, idxLoja = 2, idxStock = 3;
+  const header = (rows[0] || []).map(norm);
+  const looksHeader = header.some(h => h.includes("artigo") || h.includes("stock") || h.includes("armaz"));
   if (looksHeader) {
     header.forEach((h, i) => {
-      if (/^(artigo|codigo|c[oó]digo|code)$/.test(h) || h.includes("artigo")) idxArt = i;
-      if (h.includes("stock") && !h.includes("real")) idxStock = i;
-      if (h.includes("venda") || h.includes("saida") || h.includes("consumo")) idxVendas = i;
+      if (h === "artigo" || h === "codigo" || (h.includes("artigo") && !h.includes("desc") && !h.includes("anul"))) idxArt = i;
+      if (h.includes("armaz") || h === "loja") idxLoja = i;
+      if (h.includes("stock")) idxStock = i;
     });
-    if (idxVendas < 0) idxVendas = header.length - 1;
-  } else {
-    idxVendas = rows[0].length > 5 ? 5 : rows[0].length - 1;
+  }
+  // Se o cabeçalho tem Artigo + Stock, forçar layout padrão Coopsintra
+  if (header[0] && header[0].includes("artigo") && header.some(h => h.includes("stock"))) {
+    idxArt = 0;
+    // procurar armaz/loja, senão col 2
+    const iL = header.findIndex(h => h.includes("armaz") || h === "loja");
+    idxLoja = iL >= 0 ? iL : 2;
+    const iS = header.findIndex(h => h.includes("stock"));
+    idxStock = iS >= 0 ? iS : 3;
   }
 
   const start = looksHeader ? 1 : 0;
+  let count = 0;
   for (let r = start; r < rows.length; r++) {
     const row = rows[r];
-    if (!row || row.length < 2) continue;
-    const code = String(row[idxArt] || "").trim();
+    if (!row || row.length < 3) continue;
+    let code = String(row[idxArt] != null ? row[idxArt] : "").trim().replace(/^["']|["']$/g, "");
     if (!/^\d{5,}/.test(code)) continue;
+    if (relevantCodes && !relevantCodes[code]) continue;
+    let loja = String(row[idxLoja] != null ? row[idxLoja] : "").trim().replace(/^["']|["']$/g, "").toUpperCase();
+    if (!loja || loja.length > 4) continue;
     const stock = parseNum(row[idxStock]);
-    let vendas = null;
-    if (idxVendas >= 0 && row[idxVendas] !== "" && row[idxVendas] !== undefined) {
-      vendas = parseNum(row[idxVendas]);
+    if (stock === null) continue;
+    if (!out[loja]) out[loja] = {};
+    out[loja][code] = stock;
+    count++;
+  }
+  out.__count = count;
+  out.__lojas = Object.keys(out).filter(k => !k.startsWith("__"));
+  out.__idx = { art: idxArt, loja: idxLoja, stock: idxStock };
+  return out;
+}
+
+
+async function onStockGeralFile(e) {
+  const file = e.target.files && e.target.files[0];
+  const msg = document.getElementById("msgStockGeral");
+  if (!file) return;
+  const setMsg = (txt, ok) => {
+    if (!msg) return;
+    const cls = ok === true ? "ok" : ok === false ? "err" : "info";
+    msg.innerHTML = '<span class="status ' + cls + '">' + txt + '</span>';
+  };
+  setMsg("A ler ficheiro (" + (file.size / 1024 / 1024).toFixed(1) + " MB)…");
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    const t0 = performance.now();
+    const name = (file.name || "").toLowerCase();
+    let rows;
+
+    if (name.endsWith(".csv") || name.endsWith(".txt")) {
+      // Ler texto com fallback de encoding
+      const buf = await file.arrayBuffer();
+      // Preferir UTF-8; se o cabeçalho ficar ilegível, tentar Windows-1252
+      let text = new TextDecoder("utf-8").decode(buf);
+      const head = text.slice(0, 120);
+      if (text.indexOf("\uFFFD") >= 0 || (head.indexOf("Artigo") < 0 && head.indexOf("artigo") < 0)) {
+        text = new TextDecoder("windows-1252").decode(buf);
+      }
+      // remover BOM
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      rows = parseCsvToRows(text);
+      setMsg("CSV lido: " + rows.length + " linhas. A filtrar…");
     } else {
-      vendas = parseNum(row[row.length - 1]);
+      const data = new Uint8Array(await file.arrayBuffer());
+      setMsg("A interpretar Excel…");
+      await new Promise(r => setTimeout(r, 20));
+      const wb = XLSX.read(data, { type: "array", dense: true, cellDates: false });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
+    }
+
+    if (!rows || rows.length < 2) {
+      throw new Error("Ficheiro vazio ou ilegível. Exporte de novo como CSV (UTF-8 ou Windows).");
+    }
+
+    // debug cabeçalho
+    console.log("Stock geral header:", rows[0]);
+    console.log("Stock geral row1:", rows[1]);
+
+    setMsg("A filtrar stock por armazém (só artigos do mapa)… " + rows.length + " linhas");
+    await new Promise(r => setTimeout(r, 20));
+
+    const relevant = allArtigoCodes();
+    const parsed = parseStockGeral(rows, Object.keys(relevant).length ? relevant : null);
+    const n = parsed.__count || 0;
+    const lojas = parsed.__lojas || [];
+    if (!n) {
+      // 2ª tentativa SEM filtro de artigos do mapa (diagnóstico)
+      const all = parseStockGeral(rows, null);
+      if (all.__count) {
+        throw new Error(
+          "Li " + all.__count + " stocks no ficheiro, mas nenhum coincide com os artigos do mapa. " +
+          "Verifique se os códigos de artigo são os mesmos (ex.: 10100029)."
+        );
+      }
+      const h = (rows[0] || []).join(" | ");
+      const sample = (rows[1] || []).slice(0, 5).join(" | ");
+      throw new Error(
+        "Nenhuma linha Artigo+Armazém+Stock encontrada. Cabeçalho: [" + h + "]. " +
+        "1ª linha dados: [" + sample + "]. " +
+        "Use o ficheiro stock-geral-mapa.csv (já filtrado) se o original falhar."
+      );
+    }
+
+    const stockGeral = {};
+    lojas.forEach(l => { stockGeral[l] = parsed[l]; });
+
+    setMsg("A gravar no Supabase (" + n + " stocks)…");
+    await new Promise(r => setTimeout(r, 20));
+
+    cloudData = await cloudGet(blobId);
+    cloudData.stockGeral = stockGeral;
+    cloudData.stockGeralMeta = {
+      fileName: file.name,
+      updatedAt: nowStr(),
+      count: n,
+      lojas: lojas,
+      ms: Math.round(performance.now() - t0)
+    };
+    await cloudPut(blobId, cloudData);
+
+    setMsg("Stock geral OK: <strong>" + n + "</strong> registos · Lojas: " + lojas.join(", ") +
+      " · " + file.name + " · " + Math.round(performance.now() - t0) + " ms", true);
+    if (msg) msg.dataset.locked = "1";
+    updatePubStatus();
+  } catch (err) {
+    console.error(err);
+    setMsg("Erro: " + (err && err.message ? err.message : err), false);
+  }
+}
+
+/** CSV robusto: deteta ; ou , e respeita aspas */
+function parseCsvToRows(text) {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  // detetar separador na 1ª linha não vazia
+  let sep = ",";
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const L = lines[i];
+    if (!L || !L.trim()) continue;
+    const sc = (L.match(/;/g) || []).length;
+    const cc = (L.match(/,/g) || []).length;
+    sep = sc > cc ? ";" : ",";
+    break;
+  }
+  const rows = [];
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    if (line == null || line === "") continue;
+    const row = [];
+    let cur = "";
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (ch === sep && !inQ) {
+        row.push(cur);
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    row.push(cur);
+    rows.push(row);
+  }
+  return rows;
+}
+
+
+function getStockSistema(code) {
+  // 1) Stock geral por armazém (ficheiro Artigos… por loja: C=Armazém, D=Stock)
+  if (cloudData && cloudData.stockGeral && currentLoja &&
+      cloudData.stockGeral[currentLoja] &&
+      cloudData.stockGeral[currentLoja][code] != null &&
+      cloudData.stockGeral[currentLoja][code] !== "") {
+    let v = cloudData.stockGeral[currentLoja][code];
+    if (v && typeof v === "object" && v.stock != null) v = v.stock;
+    const n = Number(v);
+    // rejeitar valores que são claramente códigos de artigo (>= 100000)
+    if (!isNaN(n) && n < 100000) return n;
+    if (!isNaN(n) && n >= 100000) { /* ignorar, cair no fallback */ }
+    else if (!isNaN(n)) return n;
+  }
+  // 2) Fallback: stock do ficheiro de vendas da loja (coluna C)
+  const d = stockData[code] || {};
+  if (d.stock != null) {
+    const n = Number(d.stock);
+    if (!isNaN(n) && n < 100000) return n;
+  }
+  return null;
+}
+
+function parseVendas(rows) {
+  // Formato Coopsintra / Primavera "Vendas 2026 - XX.xlsx":
+  // Linhas de dados: A=Artigo, B=Descrição, C=STK Actual, D=Vendas N-2,
+  //                  E=Vendas Ano Anterior, F=Vendas Ano Corrente
+  // O cabeçalho costuma vir desalinhado (só a partir de STK) — não confiar cegamente nele.
+  const out = {};
+  if (!rows || !rows.length) return out;
+
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.length < 2) continue;
+    const code = String(row[0] || "").trim();
+    if (!/^\d{5,}/.test(code)) continue; // só linhas de artigo
+
+    // Stock da folha de vendas (fallback) = coluna C (índice 2)
+    const stock = parseNum(row[2]);
+
+    // Vendas Ano Corrente = coluna F (índice 5). Se não existir, última coluna numérica.
+    let vendas = null;
+    if (row.length > 5 && row[5] !== "" && row[5] !== undefined) {
+      vendas = parseNum(row[5]);
+    } else {
+      // procurar da direita para a esquerda um número
+      for (let i = row.length - 1; i >= 2; i--) {
+        const n = parseNum(row[i]);
+        if (n !== null) { vendas = n; break; }
+      }
     }
     out[code] = { stock, vendas };
   }
   return out;
 }
+
 function parseNum(v) {
   if (v === "" || v === null || v === undefined) return null;
-  if (typeof v === "number") return v;
-  const n = parseFloat(String(v).replace(",", ".").replace(/\s/g, ""));
+  if (typeof v === "number") return isNaN(v) ? null : v;
+  let s = String(v).trim();
+  // remover aspas
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")))
+    s = s.slice(1, -1).trim();
+  // espaços (incl. NBSP) e pontos de milhar → vírgula decimal PT
+  s = s.replace(/[\s\u00A0]/g, "");
+  // se tem vírgula e ponto: assumir . milhar e , decimal (1.234,56)
+  if (s.indexOf(",") >= 0 && s.indexOf(".") >= 0) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (s.indexOf(",") >= 0) {
+    // só vírgula → decimal PT (28,00)
+    s = s.replace(",", ".");
+  }
+  const n = parseFloat(s);
   return isNaN(n) ? null : n;
 }
 function updatePubStatus() {
@@ -1249,8 +1503,18 @@ function updatePubStatus() {
       parts.push(LOJAS[c] + " (" + Object.keys(p.stockData).length + ")");
   });
   const el = document.getElementById("pubStatus");
-  if (!parts.length) { el.textContent = "Nenhuma loja com dados ainda."; el.className = "status info"; }
-  else { el.textContent = "Publicado: " + parts.join(" · "); el.className = "status ok"; }
+  const sg = cloudData && cloudData.stockGeralMeta;
+  const sgTxt = sg ? ("Stock geral: " + (sg.count || 0) + " artigos (" + (sg.updatedAt || "") + ")") : "Stock geral: não carregado";
+  if (!parts.length && !sg) { el.textContent = "Nenhum dado publicado ainda."; el.className = "status info"; }
+  else {
+    el.textContent = sgTxt + (parts.length ? " · Vendas: " + parts.join(" · ") : "");
+    el.className = "status ok";
+  }
+  const msg = document.getElementById("msgStockGeral");
+  if (msg && sg && !msg.dataset.locked) {
+    msg.innerHTML = '<span class="status ok">Stock geral: <strong>' + (sg.count || 0) + '</strong> artigos · ' +
+      (sg.fileName || "") + ' · ' + (sg.updatedAt || "") + '</span>';
+  }
 }
 
 function calcPrevisao(stockUsado, vendas) {
@@ -1265,7 +1529,8 @@ function renderTable() {
   const ARTIGOS = getArtigos();
   ARTIGOS.forEach(art => {
     const d = stockData[art.c] || {};
-    const stockSis = d.stock != null ? d.stock : "";
+    const stockVal = (typeof getStockSistema === "function") ? getStockSistema(art.c) : d.stock;
+    const stockSis = stockVal != null && stockVal !== "" ? stockVal : "";
     const vendas = d.vendas != null ? d.vendas : "";
     const tr = document.createElement("tr");
     tr.dataset.code = art.c;
@@ -1598,6 +1863,12 @@ async function enviarEmail() {
 }
 
 fillFornSelects();
+
+document.addEventListener("DOMContentLoaded", function() {
+  const fsg = document.getElementById("fileStockGeral");
+  if (fsg) fsg.addEventListener("change", onStockGeralFile);
+});
+
 (function init() {
   const id = getUrlBlobId();
   if (id) document.getElementById("blobIdInput").value = id;
