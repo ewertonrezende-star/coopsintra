@@ -1611,20 +1611,37 @@ function updatePrevisaoRow(tr) {
   const vendasTxt = tr.querySelector(".vendas").textContent.trim();
   const stockRealVal = tr.querySelector(".stock-real").value.trim();
   const prevCell = tr.querySelector("[data-prev]");
+
   let stockUsado = null;
-  if (stockRealVal !== "") stockUsado = Number(stockRealVal);
-  else if (stockSisTxt !== "—" && stockSisTxt !== "") stockUsado = Number(stockSisTxt);
-  const vendas = (vendasTxt !== "—" && vendasTxt !== "") ? Number(vendasTxt) : 0;
+
+  // Stock Real preenchido tem sempre prioridade, inclusive quando é 0
+  if (stockRealVal !== "") {
+    stockUsado = Number(stockRealVal);
+  }
+  // Sem Stock Real, utiliza o Stock Sistema, mas nunca abaixo de zero
+  else if (stockSisTxt !== "—" && stockSisTxt !== "") {
+    stockUsado = Math.max(0, Number(stockSisTxt));
+  }
+
+  const vendas = (vendasTxt !== "—" && vendasTxt !== "")
+    ? Number(vendasTxt)
+    : 0;
+
   if (stockUsado === null || isNaN(stockUsado)) {
-    prevCell.textContent = "—"; prevCell.className = "num prev zero";
+    prevCell.textContent = "—";
+    prevCell.className = "num prev zero";
     updateEncomendaFinal(tr);
     return;
   }
+
   const p = calcPrevisao(stockUsado, vendas);
+
   prevCell.textContent = p === null ? "—" : p;
   prevCell.className = "num prev" + (p === 0 || p === null ? " zero" : "");
+
   updateEncomendaFinal(tr);
 }
+  
 function updateEncomendaFinal(tr) {
   const prevCell = tr.querySelector("[data-prev]");
   const finalCell = tr.querySelector("[data-final]");
