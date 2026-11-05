@@ -1444,56 +1444,56 @@ function getStockSistema(code) {
 
 function parseVendas(rows) {
   // Formato Coopsintra / Primavera "Vendas 2026 - XX.xlsx":
-  // Linhas de dados: A=Artigo, B=Descrição, C=STK Actual, D=Vendas N-2,
-  //                  E=Vendas Ano Anterior, F=Vendas Ano Corrente
-  // O cabeçalho costuma vir desalinhado (só a partir de STK) — não confiar cegamente nele.
+  // A=Artigo, B=Descrição, C=STK Actual, D=Vendas N-2,
+  // E=Vendas Ano Anterior, F=Vendas Ano Corrente.
+  // A coluna F é a única fonte das vendas correntes.
   const out = {};
   if (!rows || !rows.length) return out;
 
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r];
     if (!row || row.length < 2) continue;
-    const code = String(row[0] || "").trim();
-    if (!/^\d{5,}/.test(code)) continue; // só linhas de artigo
 
-    // Stock da folha de vendas (fallback) = coluna C (índice 2)
+    const code = String(row[0] || "").trim();
+    if (!/^\d{5,}/.test(code)) continue;
+
+    // Stock da folha de vendas: coluna C (índice 2).
     const stock = parseNum(row[2]);
 
-    // Vendas Ano Corrente = coluna F (índice 5). Se não existir, última coluna numérica.
-    let vendas = null;
-    if (row.length > 5 && row[5] !== "" && row[5] !== undefined) {
-      vendas = parseNum(row[5]);
-    } else {
-      // procurar da direita para a esquerda um número
-      for (let i = row.length - 1; i >= 2; i--) {
-        const n = parseNum(row[i]);
-        if (n !== null) { vendas = n; break; }
-      }
-    }
-    out[code] = { stock, vendas };
+    // Vendas correntes: exclusivamente coluna F (índice 5).
+    // Se F estiver vazia, ausente ou inválida, assume zero.
+    // Nunca utiliza valores das colunas D ou E como substituição.
+    const vendas = parseNum(row[5]) ?? 0;
+
+    out[code] = {
+      stock: stock,
+      vendas: vendas
+    };
   }
+
   return out;
 }
 
 function parseNum(v) {
   if (v === "" || v === null || v === undefined) return null;
   if (typeof v === "number") return isNaN(v) ? null : v;
+
   let s = String(v).trim();
-  // remover aspas
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")))
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
     s = s.slice(1, -1).trim();
-  // espaços (incl. NBSP) e pontos de milhar → vírgula decimal PT
+  }
+
   s = s.replace(/[\s\u00A0]/g, "");
-  // se tem vírgula e ponto: assumir . milhar e , decimal (1.234,56)
   if (s.indexOf(",") >= 0 && s.indexOf(".") >= 0) {
     s = s.replace(/\./g, "").replace(",", ".");
   } else if (s.indexOf(",") >= 0) {
-    // só vírgula → decimal PT (28,00)
     s = s.replace(",", ".");
   }
+
   const n = parseFloat(s);
   return isNaN(n) ? null : n;
 }
+
 function updatePubStatus() {
   const lojas = (cloudData && cloudData.lojas) || {};
   const parts = [];
